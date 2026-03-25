@@ -1,0 +1,817 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>جدول مناوبة الاتصال – قسم صحة الفم والأسنان</title>
+<link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;800&display=swap" rel="stylesheet"/>
+<script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+<script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Tajawal',sans-serif;background:#eef7f4;min-height:100vh;padding:12px}
+button,input,textarea,select{font-family:'Tajawal',sans-serif}
+button{cursor:pointer}
+::-webkit-scrollbar{width:5px}
+::-webkit-scrollbar-thumb{background:#0d7a5f55;border-radius:3px}
+@media print{
+  body{background:white!important;padding:0!important}
+  #app-root>*:not(#print-area){display:none!important}
+  #print-area{display:block!important}
+  @page{margin:12mm;size:A4}
+}
+#print-area{display:none}
+</style>
+</head>
+<body>
+<div id="app-root"><div id="root"></div><div id="print-area"></div></div>
+<script type="text/babel">
+const {useState,useMemo,useCallback} = React;
+
+const EMPLOYEES=[
+  "وضحى العتيبي","زريفة العنزي","سلمى الكناني","ختام المرشد",
+  "منيفة المطيري","سارة الشهراني","سلطانة الايداء","نوال الطياوي",
+  "فاطمة الحربي","حجاب العنزي","حمدان العتيبي","ماجد الجبرين",
+  "محمد الدوسري","ثامر العثمان"
+];
+const MANAGER="زياد الحربي";
+const CLINIC_NUMS=[8,9,13,14,15,16,17,18,19,20];
+const AR_DAYS=["الأحد","الاثنين","الثلاثاء","الأربعاء","الخميس","الجمعة","السبت"];
+const AR_DAYS_S=["أحد","اثنين","ثلاثاء","أربعاء","خميس","جمعة","سبت"];
+const AR_MONTHS=["يناير","فبراير","مارس","أبريل","مايو","يونيو","يوليو","أغسطس","سبتمبر","أكتوبر","نوفمبر","ديسمبر"];
+const WC={
+  red:{bg:"#fff1f2",border:"#fca5a5",dot:"#ef4444",text:"#b91c1c",tag:"📵 متتالي"},
+  yellow:{bg:"#fefce8",border:"#fde047",dot:"#f59e0b",text:"#a16207",tag:"⚠️ زائد"},
+  green:{bg:"#f0fdf4",border:"#86efac",dot:"#22c55e",text:"#166534",tag:"✅ صالح"},
+};
+const fn=n=>n.split(" ")[0];
+const isPresent=(emp,idx,vac)=>!(vac[emp]||[]).includes(idx);
+const fmtDate=d=>`${d.day} ${d.month} ${d.year}`;
+
+function generateAllDays(numWeeks=9){
+  const days=[]; const d=new Date(2026,2,25);
+  let weekNum=1,idx=0;
+  while(weekNum<=numWeeks){
+    const dow=d.getDay();
+    if(dow===0&&idx>0){weekNum++;if(weekNum>numWeeks)break;}
+    if(dow<=4){
+      days.push({date:new Date(d),dayName:AR_DAYS[dow],dayShort:AR_DAYS_S[dow],
+        weekNum,idx:idx++,day:d.getDate(),month:AR_MONTHS[d.getMonth()],
+        monthNum:d.getMonth(),year:d.getFullYear()});
+    }
+    d.setDate(d.getDate()+1);
+  }
+  return days;
+}
+const ALL_DAYS=generateAllDays(9);
+function getWeeks(){const m={};ALL_DAYS.forEach(d=>{if(!m[d.weekNum])m[d.weekNum]=[];m[d.weekNum].push(d);});return m;}
+const WEEKS_MAP=getWeeks();
+const WEEK_NUMS=Object.keys(WEEKS_MAP).map(Number).sort((a,b)=>a-b);
+function weekDateRange(wn){
+  const days=WEEKS_MAP[wn];const f=days[0],l=days[days.length-1];
+  if(f.monthNum===l.monthNum)return`${f.day} – ${l.day} ${f.month} ${f.year}`;
+  return`${f.day} ${f.month} – ${l.day} ${l.month} ${f.year}`;
+}
+
+function getEffectiveCounts(schedule,upTo,vac){
+  const c={};EMPLOYEES.forEach(e=>c[e]=0);
+  for(let d=0;d<upTo;d++){
+    (schedule[d]?.oncall||[]).forEach(e=>{if(c[e]!==undefined)c[e]++;});
+    const absent=EMPLOYEES.filter(e=>!isPresent(e,d,vac));
+    if(absent.length){
+      const need=schedule[d]?.managerPresent?5:4;
+      const prCnt=EMPLOYEES.length-absent.length;
+      const avg=prCnt>0?need/prCnt:0;
+      absent.forEach(e=>{c[e]=(c[e]||0)+avg;});
+    }
+  }
+  return c;
+}
+function getRangeCounts(schedule,fromIdx,toIdx,vac){
+  const c={};EMPLOYEES.forEach(e=>c[e]=0);
+  for(let d=fromIdx;d<=toIdx;d++){
+    if(d>=ALL_DAYS.length)break;
+    (schedule[d]?.oncall||[]).forEach(e=>{if(c[e]!==undefined)c[e]++;});
+    const absent=EMPLOYEES.filter(e=>!isPresent(e,d,vac));
+    if(absent.length){
+      const need=schedule[d]?.managerPresent?5:4;
+      const prCnt=EMPLOYEES.length-absent.length;
+      const avg=prCnt>0?need/prCnt:0;
+      absent.forEach(e=>{c[e]=(c[e]||0)+avg;});
+    }
+  }
+  return c;
+}
+function suggest(dayIdx,schedule,managerPresent,vac){
+  const needed=managerPresent?5:4;
+  const eff=getEffectiveCounts(schedule,dayIdx,vac);
+  const prev=new Set(dayIdx>0?(schedule[dayIdx-1]?.oncall||[]):[]);
+  const avail=EMPLOYEES.filter(e=>isPresent(e,dayIdx,vac));
+  const sorted=[...avail].sort((a,b)=>eff[a]-eff[b]||EMPLOYEES.indexOf(a)-EMPLOYEES.indexOf(b));
+  const eligible=sorted.filter(e=>!prev.has(e));
+  const fallback=sorted.filter(e=>prev.has(e));
+  return[...eligible,...fallback].slice(0,needed);
+}
+function buildInit(vac={}){
+  const s={};
+  for(let i=0;i<ALL_DAYS.length;i++)
+    s[i]={oncall:suggest(i,s,false,vac),managerPresent:false};
+  return s;
+}
+
+/* ── Vacation Modal ── */
+function VacModal({vac,onSave,onClose}){
+  const [sel,setSel]=useState(null);
+  const [draft,setDraft]=useState(()=>{const d={};EMPLOYEES.forEach(e=>d[e]=[...(vac[e]||[])]);return d;});
+  function toggle(emp,idx){setDraft(p=>({...p,[emp]:p[emp].includes(idx)?p[emp].filter(x=>x!==idx):[...p[emp],idx]}));}
+  function save(){const out={};EMPLOYEES.forEach(e=>{if(draft[e].length)out[e]=draft[e];});onSave(out);onClose();}
+  return(
+    <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.45)",zIndex:999,display:"flex",alignItems:"center",justifyContent:"center",padding:"16px"}}>
+      <div style={{background:"white",borderRadius:"16px",width:"100%",maxWidth:"540px",maxHeight:"88vh",display:"flex",flexDirection:"column",boxShadow:"0 20px 60px rgba(0,0,0,0.25)"}}>
+        <div style={{padding:"16px 20px",borderBottom:"1px solid #e5e7eb",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+          <div><div style={{fontSize:"16px",fontWeight:800,color:"#0d7a5f"}}>🏖️ إدارة الإجازات</div><div style={{fontSize:"11px",color:"#9ca3af",marginTop:"2px"}}>حدد أيام الغياب لكل موظف</div></div>
+          <button onClick={onClose} style={{background:"#f3f4f6",border:"none",borderRadius:"8px",width:32,height:32,fontSize:"16px",color:"#6b7280"}}>✕</button>
+        </div>
+        <div style={{overflow:"auto",padding:"14px 20px",flex:1}}>
+          {EMPLOYEES.map(emp=>{
+            const vd=draft[emp]||[],open=sel===emp;
+            return(
+              <div key={emp} style={{marginBottom:"7px",border:`1.5px solid ${vd.length?"#fde047":"#e5e7eb"}`,borderRadius:"10px",overflow:"hidden"}}>
+                <div onClick={()=>setSel(open?null:emp)} style={{padding:"10px 14px",display:"flex",justifyContent:"space-between",alignItems:"center",cursor:"pointer",background:vd.length?"#fefce8":"#fafafa"}}>
+                  <div style={{display:"flex",alignItems:"center",gap:"10px"}}>
+                    <div style={{width:30,height:30,borderRadius:"50%",background:vd.length?"#fde68a":"#e5e7eb",display:"flex",alignItems:"center",justifyContent:"center",fontSize:"13px",fontWeight:800,color:vd.length?"#92400e":"#6b7280"}}>{fn(emp)[0]}</div>
+                    <div>
+                      <div style={{fontSize:"13px",fontWeight:700}}>{emp}</div>
+                      {vd.length>0&&<div style={{fontSize:"10px",color:"#d97706",marginTop:"1px"}}>إجازة {vd.length} {vd.length===1?"يوم":"أيام"}: {vd.sort((a,b)=>a-b).map(i=>`${ALL_DAYS[i].day} ${ALL_DAYS[i].month}`).join("، ")}</div>}
+                    </div>
+                  </div>
+                  <div style={{display:"flex",gap:"6px",alignItems:"center"}}>
+                    {vd.length>0&&<button onClick={e=>{e.stopPropagation();setDraft(p=>({...p,[emp]:[]}))} } style={{background:"#fee2e2",border:"none",borderRadius:"6px",padding:"3px 8px",fontSize:"11px",color:"#b91c1c",fontWeight:600}}>مسح</button>}
+                    <span style={{color:"#9ca3af",fontSize:"11px"}}>{open?"▲":"▼"}</span>
+                  </div>
+                </div>
+                {open&&(
+                  <div style={{padding:"10px 14px",borderTop:"1px solid #e5e7eb",background:"white"}}>
+                    {WEEK_NUMS.map(wn=>(
+                      <div key={wn} style={{marginBottom:"10px"}}>
+                        <div style={{fontSize:"10px",color:"#9ca3af",fontWeight:600,marginBottom:"5px"}}>الأسبوع {wn} — {weekDateRange(wn)}</div>
+                        <div style={{display:"flex",gap:"5px",flexWrap:"wrap"}}>
+                          {WEEKS_MAP[wn].map(d=>{const on=vd.includes(d.idx);return(
+                            <button key={d.idx} onClick={()=>toggle(emp,d.idx)}
+                              style={{padding:"5px 10px",borderRadius:"7px",border:`2px solid ${on?"#f59e0b":"#e5e7eb"}`,background:on?"#fef3c7":"white",color:on?"#92400e":"#6b7280",fontSize:"12px",fontWeight:on?700:400,lineHeight:1.3,textAlign:"center"}}>
+                              {on?"🏖️ ":""}{d.day} {d.month}<br/><span style={{fontSize:"9px",opacity:.6}}>{d.dayShort}</span>
+                            </button>);
+                          })}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+        <div style={{padding:"14px 20px",borderTop:"1px solid #e5e7eb",display:"flex",gap:"10px"}}>
+          <button onClick={save} style={{flex:1,padding:"11px",background:"#0d7a5f",color:"white",border:"none",borderRadius:"9px",fontSize:"14px",fontWeight:700}}>✅ حفظ وتحديث الجدول</button>
+          <button onClick={onClose} style={{padding:"11px 18px",background:"#f3f4f6",color:"#555",border:"none",borderRadius:"9px",fontSize:"14px"}}>إلغاء</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ── Clinic Grid with assignment ── */
+function ClinicGrid({clinicStaff, vacToday, managerPresent, oncallCount, needed, clinicAssign, setClinicAssign, onAdd, onMoveToOncall}){
+  const [pickerEmp,setPickerEmp]=useState(null); // emp name for picker
+
+  const assignedClinics=Object.values(clinicAssign); // list of assigned clinic nums
+  const empClinic=clinicAssign; // emp -> clinicNum
+  const clinicEmp={}; // clinicNum -> emp
+  Object.entries(clinicAssign).forEach(([e,c])=>clinicEmp[c]=e);
+
+  function assignClinic(emp,num){
+    // remove existing assignment of this clinic
+    const newAssign={...clinicAssign};
+    // unassign any other emp that had this clinic
+    Object.entries(newAssign).forEach(([e,c])=>{if(c===num&&e!==emp)delete newAssign[e];});
+    if(num===null){delete newAssign[emp];}
+    else{newAssign[emp]=num;}
+    setClinicAssign(newAssign);
+    setPickerEmp(null);
+  }
+
+  const allAssigned=clinicStaff.every(e=>empClinic[e]);
+  const clinicCount=clinicStaff.length+(managerPresent?1:0);
+
+  return(
+    <div style={{background:"white",borderRadius:"12px",boxShadow:"0 2px 8px rgba(0,0,0,0.07)",padding:"14px"}}>
+      {/* Header */}
+      <div style={{display:"flex",alignItems:"center",gap:"10px",marginBottom:"12px",flexWrap:"wrap"}}>
+        <span style={{fontSize:"15px",fontWeight:800,color:"#1e4d3a"}}>🏥 توزيع العيادات</span>
+        <span style={{background:clinicCount===10?"#daf0e8":"#fee2e2",color:clinicCount===10?"#0d7a5f":"#b91c1c",border:`1.5px solid ${clinicCount===10?"#86efac":"#fca5a5"}`,padding:"3px 11px",borderRadius:20,fontSize:"13px",fontWeight:700}}>
+          {clinicCount}/10
+        </span>
+        {!allAssigned&&clinicStaff.length>0&&(
+          <span style={{fontSize:"11px",color:"#9ca3af"}}>اضغط اسم الطبيب لتعيين عيادته</span>
+        )}
+      </div>
+
+      {/* Clinic grid */}
+      <div style={{display:"grid",gridTemplateColumns:"repeat(5,1fr)",gap:"8px",marginBottom:"12px"}}>
+        {CLINIC_NUMS.map(num=>{
+          const assignedEmp=clinicEmp[num];
+          const isManager=managerPresent&&num===clinicAssign[MANAGER];
+          return(
+            <div key={num}
+              onClick={()=>{if(assignedEmp){setPickerEmp(assignedEmp);}}}
+              style={{borderRadius:"10px",border:`2px solid ${assignedEmp?"#6ee7b7":"#e5e7eb"}`,background:assignedEmp?"#f0fdf4":"#f9fafb",padding:"8px 6px",textAlign:"center",cursor:assignedEmp?"pointer":"default",transition:"all 0.15s",minHeight:62,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:"3px"}}>
+              <div style={{fontSize:"15px",fontWeight:800,color:assignedEmp?"#0d7a5f":"#d1d5db"}}>ع{num}</div>
+              {assignedEmp?(
+                <div style={{fontSize:"10px",fontWeight:700,color:"#374151",lineHeight:1.2}}>{fn(assignedEmp)}</div>
+              ):(
+                <div style={{fontSize:"10px",color:"#d1d5db"}}>فارغة</div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Unassigned doctors list */}
+      <div style={{borderTop:"1px dashed #e5e7eb",paddingTop:"10px"}}>
+        <div style={{fontSize:"11px",color:"#9ca3af",marginBottom:"7px",fontWeight:600}}>
+          {managerPresent?"👨‍⚕️ رئيس القسم + الأخصائيون في العيادة:":"👨‍⚕️ الأخصائيون في العيادة:"}
+        </div>
+        <div style={{display:"flex",gap:"6px",flexWrap:"wrap"}}>
+          {managerPresent&&(
+            <div onClick={()=>setPickerEmp(MANAGER)}
+              style={{background:"#daf0e8",border:`2px solid ${clinicAssign[MANAGER]?"#6ee7b7":"#a7f3d0"}`,borderRadius:"9px",padding:"7px 11px",cursor:"pointer",transition:"all 0.15s",display:"flex",alignItems:"center",gap:"6px"}}
+              onMouseEnter={e=>{e.currentTarget.style.background="#bbf7d0";}}
+              onMouseLeave={e=>{e.currentTarget.style.background="#daf0e8";}}>
+              <span style={{fontSize:"12px",fontWeight:800,color:"#0d7a5f"}}>👨‍⚕️ {fn(MANAGER)}</span>
+              {clinicAssign[MANAGER]?<span style={{background:"#0d7a5f",color:"white",borderRadius:"5px",padding:"1px 6px",fontSize:"11px",fontWeight:700}}>ع{clinicAssign[MANAGER]}</span>:<span style={{fontSize:"10px",color:"#9ca3af"}}>بدون عيادة</span>}
+            </div>
+          )}
+          {clinicStaff.map(emp=>{
+            const cnum=clinicAssign[emp];
+            const canMove=oncallCount<needed;
+            return(
+              <div key={emp}
+                style={{background:cnum?"#f0fdf4":"#f8fafc",border:`2px solid ${cnum?"#6ee7b7":"#e2e8f0"}`,borderRadius:"9px",padding:"7px 11px",display:"flex",alignItems:"center",gap:"6px",transition:"all 0.15s"}}>
+                <span onClick={()=>setPickerEmp(emp)} style={{fontSize:"12px",fontWeight:cnum?700:500,color:"#374151",cursor:"pointer"}}
+                  title="انقر لتعيين/تغيير رقم العيادة">
+                  {fn(emp)}
+                </span>
+                {cnum&&<span style={{background:"#0d7a5f",color:"white",borderRadius:"5px",padding:"1px 6px",fontSize:"11px",fontWeight:700}}>ع{cnum}</span>}
+                {canMove&&(
+                  <span onClick={()=>onMoveToOncall(emp)} title="نقل للـ OnCall"
+                    style={{fontSize:"11px",color:"#9ca3af",cursor:"pointer",padding:"1px 4px",borderRadius:"4px",background:"#f3f4f6"}}
+                    onMouseEnter={e=>{e.currentTarget.style.color="#0d7a5f";e.currentTarget.style.background="#daf0e8";}}
+                    onMouseLeave={e=>{e.currentTarget.style.color="#9ca3af";e.currentTarget.style.background="#f3f4f6";}}>
+                    📞
+                  </span>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Vacation */}
+      {vacToday.length>0&&(
+        <div style={{marginTop:"10px",borderTop:"1px dashed #e5e7eb",paddingTop:"9px"}}>
+          <div style={{fontSize:"11px",color:"#d97706",fontWeight:600,marginBottom:"5px"}}>🏖️ في إجازة:</div>
+          <div style={{display:"flex",gap:"5px",flexWrap:"wrap"}}>
+            {vacToday.map(emp=><div key={emp} style={{background:"#fef3c7",border:"1.5px solid #fde68a",borderRadius:"7px",padding:"4px 9px",fontSize:"11px",color:"#92400e"}}>{fn(emp)}</div>)}
+          </div>
+        </div>
+      )}
+
+      {/* Clinic picker popup */}
+      {pickerEmp&&(
+        <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.3)",zIndex:900,display:"flex",alignItems:"center",justifyContent:"center"}} onClick={()=>setPickerEmp(null)}>
+          <div onClick={e=>e.stopPropagation()} style={{background:"white",borderRadius:"14px",padding:"16px 20px",boxShadow:"0 10px 40px rgba(0,0,0,0.2)",minWidth:280}}>
+            <div style={{fontSize:"14px",fontWeight:800,color:"#0d7a5f",marginBottom:"4px"}}>🏥 تعيين عيادة</div>
+            <div style={{fontSize:"12px",color:"#6b7280",marginBottom:"12px"}}>اختر رقم عيادة <strong>{pickerEmp===MANAGER?"أ. "+fn(MANAGER):"أ. "+fn(pickerEmp)}</strong></div>
+            <div style={{display:"grid",gridTemplateColumns:"repeat(5,1fr)",gap:"7px",marginBottom:"12px"}}>
+              {CLINIC_NUMS.map(num=>{
+                const takenBy=clinicEmp[num];
+                const isMine=clinicAssign[pickerEmp]===num;
+                const isTaken=takenBy&&takenBy!==pickerEmp;
+                return(
+                  <button key={num} onClick={()=>assignClinic(pickerEmp,num)}
+                    style={{padding:"10px 4px",borderRadius:"9px",border:`2px solid ${isMine?"#0d7a5f":isTaken?"#fca5a5":"#e5e7eb"}`,
+                      background:isMine?"#daf0e8":isTaken?"#fff1f2":"white",
+                      color:isMine?"#0d7a5f":isTaken?"#b91c1c":"#374151",
+                      fontWeight:isMine?800:500,fontSize:"13px",lineHeight:1.3,transition:"all 0.15s"}}>
+                    ع{num}
+                    {isTaken&&<div style={{fontSize:"9px",marginTop:2}}>{fn(takenBy)}</div>}
+                    {isMine&&<div style={{fontSize:"9px",marginTop:2}}>✓</div>}
+                  </button>
+                );
+              })}
+            </div>
+            {clinicAssign[pickerEmp]&&(
+              <button onClick={()=>assignClinic(pickerEmp,null)}
+                style={{width:"100%",padding:"7px",background:"#fee2e2",color:"#b91c1c",border:"none",borderRadius:"8px",fontSize:"12px",fontWeight:600,marginBottom:"8px"}}>
+                ✕ إزالة التعيين
+              </button>
+            )}
+            <button onClick={()=>setPickerEmp(null)} style={{width:"100%",padding:"8px",background:"#f3f4f6",color:"#555",border:"none",borderRadius:"8px",fontSize:"13px"}}>إغلاق</button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ── PDF Modal ── */
+function PdfModal({schedule,vac,clinicAssignments,onClose}){
+  const [period,setPeriod]=useState("week");
+  const [selIdx,setSelIdx]=useState(0);
+  const [notes,setNotes]=useState("");
+  const [header,setHeader]=useState("قسم صحة الفم والأسنان");
+
+  const printDays=useMemo(()=>{
+    if(period==="day")return[ALL_DAYS[selIdx]];
+    if(period==="2days")return ALL_DAYS.slice(selIdx,selIdx+2);
+    if(period==="week"){const wn=ALL_DAYS[selIdx]?.weekNum;return WEEKS_MAP[wn]||[];}
+    if(period==="month"){const mn=ALL_DAYS[selIdx]?.monthNum;return ALL_DAYS.filter(d=>d.monthNum===mn);}
+    return[];
+  },[period,selIdx]);
+
+  function doPrint(){
+    const pArea=document.getElementById('print-area');
+    const periodLabel={day:"يومي","2days":"يومان",week:"أسبوعي",month:"شهري"}[period];
+    const dateRange=printDays.length===1?fmtDate(printDays[0]):`${fmtDate(printDays[0])} – ${fmtDate(printDays[printDays.length-1])}`;
+
+    const rows=printDays.map(d=>{
+      const s=schedule[d.idx];
+      const oncall=(s?.oncall||[]);
+      const oncallSet=new Set(oncall);
+      const mpresent=s?.managerPresent;
+      const clinicAssign=clinicAssignments[d.idx]||{};
+      const clinicEmp={};
+      Object.entries(clinicAssign).forEach(([e,c])=>clinicEmp[c]=e);
+      const absent=EMPLOYEES.filter(e=>!isPresent(e,d.idx,vac));
+
+      // clinic table rows
+      const clinicRows=CLINIC_NUMS.map(num=>{
+        const emp=clinicEmp[num]||(mpresent&&clinicAssign[MANAGER]===num?MANAGER:null);
+        return`<tr>
+          <td style="padding:5px 10px;border:1px solid #e5e7eb;text-align:center;font-weight:700;color:#0d7a5f;font-size:13px;width:60px;">ع${num}</td>
+          <td style="padding:5px 10px;border:1px solid #e5e7eb;font-size:13px;">${emp?`أ. ${fn(emp)}`:'<span style="color:#d1d5db;">—</span>'}</td>
+        </tr>`;
+      }).join('');
+
+      const oncallList=oncall.map(e=>`أ. ${fn(e)}`).join(' &nbsp;|&nbsp; ');
+      const absentList=absent.length?absent.map(e=>`🏖️ ${fn(e)}`).join('، '):'—';
+
+      return`
+        <div style="margin-bottom:14px;page-break-inside:avoid;">
+          <div style="background:#0d7a5f;color:white;padding:8px 14px;border-radius:8px 8px 0 0;display:flex;justify-content:space-between;align-items:center;">
+            <div style="font-size:15px;font-weight:800;">${d.dayName} ${d.day} ${d.month} ${d.year}</div>
+            <div style="font-size:11px;opacity:.8;">الأسبوع ${d.weekNum}</div>
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;border:1px solid #e5e7eb;border-top:none;border-radius:0 0 8px 8px;overflow:hidden;">
+            <div style="border-left:1px solid #e5e7eb;">
+              <div style="background:#f0fdf4;padding:6px 10px;font-size:11px;font-weight:700;color:#0d7a5f;border-bottom:1px solid #e5e7eb;">🏥 توزيع العيادات</div>
+              <table style="width:100%;border-collapse:collapse;">${clinicRows}</table>
+            </div>
+            <div>
+              <div style="background:#eff6ff;padding:6px 10px;font-size:11px;font-weight:700;color:#1e40af;border-bottom:1px solid #e5e7eb;">📞 OnCall</div>
+              <div style="padding:10px;font-size:12px;line-height:2;">
+                ${oncall.map(e=>`<div style="padding:3px 0;border-bottom:1px dashed #f3f4f6;">أ. ${fn(e)}</div>`).join('')}
+              </div>
+              ${absent.length?`<div style="background:#fef9c3;padding:6px 10px;font-size:11px;border-top:1px solid #e5e7eb;">🏖️ إجازة: ${absent.map(e=>fn(e)).join('، ')}</div>`:''}
+            </div>
+          </div>
+        </div>`;
+    }).join('');
+
+    const fromIdx=printDays[0]?.idx||0;
+    const toIdx=printDays[printDays.length-1]?.idx||0;
+    const counts=getRangeCounts(schedule,fromIdx,toIdx,vac);
+    const statRows=EMPLOYEES.map(e=>`<td style="padding:5px 6px;border:1px solid #e5e7eb;text-align:center;font-size:11px;">${counts[e]%1===0?counts[e]:counts[e].toFixed(1)}</td>`).join('');
+
+    pArea.innerHTML=`
+      <div style="font-family:'Tajawal',sans-serif;direction:rtl;color:#1a1a1a;">
+        <div style="border-bottom:3px solid #0d7a5f;padding-bottom:12px;margin-bottom:16px;display:flex;justify-content:space-between;align-items:flex-end;">
+          <div>
+            <div style="font-size:20px;font-weight:800;color:#0d7a5f;">🦷 جدول توزيع العيادات ومناوبة OnCall</div>
+            <div style="font-size:13px;color:#6b7280;margin-top:4px;">${header}</div>
+          </div>
+          <div style="text-align:left;font-size:12px;color:#6b7280;">
+            <div>الفترة: <strong>${periodLabel}</strong></div>
+            <div>${dateRange}</div>
+            <div>طُبع: ${new Date().toLocaleDateString('ar-SA')}</div>
+          </div>
+        </div>
+        ${notes?`<div style="background:#fef9e7;border:1.5px solid #fde68a;border-radius:8px;padding:10px 14px;margin-bottom:16px;font-size:13px;color:#78350f;white-space:pre-wrap;">${notes}</div>`:''}
+        ${rows}
+        <div style="margin-top:14px;border-top:1px solid #e5e7eb;padding-top:8px;display:flex;justify-content:space-between;font-size:10px;color:#9ca3af;">
+          <span>قسم صحة الفم والأسنان • 4:00م – 11:00م • 10 عيادات</span>
+        </div>
+      </div>`;
+    window.print();
+  }
+
+  const PERIODS=[{k:"day",l:"📄 يومي"},{k:"2days",l:"📄 يومان"},{k:"week",l:"📅 أسبوعي"},{k:"month",l:"📆 شهري"}];
+  const card={background:"white",borderRadius:"12px",boxShadow:"0 2px 8px rgba(0,0,0,0.07)",padding:"14px"};
+  return(
+    <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.45)",zIndex:998,display:"flex",alignItems:"center",justifyContent:"center",padding:"16px"}}>
+      <div style={{background:"#f5f7fa",borderRadius:"16px",width:"100%",maxWidth:"600px",maxHeight:"90vh",display:"flex",flexDirection:"column",boxShadow:"0 20px 60px rgba(0,0,0,0.25)"}}>
+        <div style={{padding:"16px 20px",borderBottom:"1px solid #e5e7eb",display:"flex",justifyContent:"space-between",alignItems:"center",background:"white",borderRadius:"16px 16px 0 0"}}>
+          <div><div style={{fontSize:"16px",fontWeight:800,color:"#0d7a5f"}}>🖨️ تصدير PDF</div><div style={{fontSize:"11px",color:"#9ca3af",marginTop:"2px"}}>اختر الفترة وخصص التقرير</div></div>
+          <button onClick={onClose} style={{background:"#f3f4f6",border:"none",borderRadius:"8px",width:32,height:32,fontSize:"16px",color:"#6b7280"}}>✕</button>
+        </div>
+        <div style={{overflow:"auto",padding:"16px",flex:1,display:"flex",flexDirection:"column",gap:"12px"}}>
+          <div style={card}>
+            <div style={{fontSize:"13px",fontWeight:700,marginBottom:"10px",color:"#374151"}}>📋 نوع التقرير</div>
+            <div style={{display:"flex",gap:"8px",flexWrap:"wrap"}}>
+              {PERIODS.map(p=>(
+                <button key={p.k} onClick={()=>setPeriod(p.k)}
+                  style={{flex:1,minWidth:100,padding:"10px 8px",borderRadius:"9px",border:`2px solid ${period===p.k?"#0d7a5f":"#e5e7eb"}`,background:period===p.k?"#daf0e8":"white",color:period===p.k?"#0d7a5f":"#555",fontSize:"13px",fontWeight:period===p.k?700:400}}>
+                  {p.l}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div style={card}>
+            <div style={{fontSize:"13px",fontWeight:700,marginBottom:"10px",color:"#374151"}}>
+              {period==="day"?"📅 اختر اليوم":period==="2days"?"📅 اختر يوم البداية":period==="week"?"📅 اختر الأسبوع":"📅 اختر الشهر"}
+            </div>
+            {(period==="day"||period==="2days")&&(
+              <select value={selIdx} onChange={e=>setSelIdx(Number(e.target.value))}
+                style={{width:"100%",padding:"9px 12px",borderRadius:"8px",border:"1.5px solid #e5e7eb",fontSize:"13px",background:"white",color:"#374151"}}>
+                {ALL_DAYS.map(d=><option key={d.idx} value={d.idx}>{d.dayName} – {d.day} {d.month} {d.year} (أسبوع {d.weekNum})</option>)}
+              </select>
+            )}
+            {period==="week"&&(
+              <div style={{display:"flex",gap:"6px",flexWrap:"wrap"}}>
+                {WEEK_NUMS.map(wn=>{const curWn=ALL_DAYS[selIdx]?.weekNum;return(
+                  <button key={wn} onClick={()=>setSelIdx(WEEKS_MAP[wn][0].idx)}
+                    style={{flex:1,minWidth:80,padding:"8px 6px",borderRadius:"8px",border:`2px solid ${curWn===wn?"#0d7a5f":"#e5e7eb"}`,background:curWn===wn?"#daf0e8":"white",color:curWn===wn?"#0d7a5f":"#555",fontSize:"11px",fontWeight:curWn===wn?700:400,lineHeight:1.4,textAlign:"center"}}>
+                    أسبوع {wn}<br/><span style={{fontSize:"9px",opacity:.7}}>{weekDateRange(wn)}</span>
+                  </button>);})}
+              </div>
+            )}
+            {period==="month"&&(
+              <div style={{display:"flex",gap:"6px",flexWrap:"wrap"}}>
+                {[...new Set(ALL_DAYS.map(d=>d.monthNum))].map(mn=>{const curMn=ALL_DAYS[selIdx]?.monthNum;const yr=ALL_DAYS.find(d=>d.monthNum===mn)?.year;return(
+                  <button key={mn} onClick={()=>setSelIdx(ALL_DAYS.find(d=>d.monthNum===mn).idx)}
+                    style={{flex:1,minWidth:90,padding:"9px 8px",borderRadius:"8px",border:`2px solid ${curMn===mn?"#0d7a5f":"#e5e7eb"}`,background:curMn===mn?"#daf0e8":"white",color:curMn===mn?"#0d7a5f":"#555",fontSize:"13px",fontWeight:curMn===mn?700:400}}>
+                    {AR_MONTHS[mn]} {yr}
+                  </button>);})}
+              </div>
+            )}
+            <div style={{marginTop:"10px",padding:"8px 12px",background:"#f0fdf4",borderRadius:"8px",fontSize:"12px",color:"#0d7a5f",fontWeight:600}}>
+              📄 {printDays.length===1?`${printDays[0]?.dayName} ${printDays[0]?.day} ${printDays[0]?.month}`:`${printDays[0]?.day} ${printDays[0]?.month} – ${printDays[printDays.length-1]?.day} ${printDays[printDays.length-1]?.month}`} ({printDays.length} يوم)
+            </div>
+          </div>
+          <div style={card}>
+            <div style={{fontSize:"13px",fontWeight:700,marginBottom:"8px",color:"#374151"}}>✏️ عنوان التقرير</div>
+            <input value={header} onChange={e=>setHeader(e.target.value)} style={{width:"100%",padding:"9px 12px",borderRadius:"8px",border:"1.5px solid #e5e7eb",fontSize:"13px",color:"#374151"}}/>
+          </div>
+          <div style={card}>
+            <div style={{fontSize:"13px",fontWeight:700,marginBottom:"8px",color:"#374151"}}>📝 ملاحظات (اختياري)</div>
+            <textarea value={notes} onChange={e=>setNotes(e.target.value)} rows={3}
+              placeholder="أي ملاحظات تظهر في أعلى التقرير..."
+              style={{width:"100%",padding:"9px 12px",borderRadius:"8px",border:"1.5px solid #e5e7eb",fontSize:"13px",resize:"vertical",color:"#374151",lineHeight:1.6}}/>
+          </div>
+        </div>
+        <div style={{padding:"14px 20px",borderTop:"1px solid #e5e7eb",display:"flex",gap:"10px",background:"white",borderRadius:"0 0 16px 16px"}}>
+          <button onClick={doPrint} style={{flex:1,padding:"12px",background:"#0d7a5f",color:"white",border:"none",borderRadius:"9px",fontSize:"14px",fontWeight:800,boxShadow:"0 2px 8px rgba(13,122,95,0.3)"}}>
+            🖨️ طباعة / حفظ PDF
+          </button>
+          <button onClick={onClose} style={{padding:"12px 18px",background:"#f3f4f6",color:"#555",border:"none",borderRadius:"9px",fontSize:"14px"}}>إلغاء</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ── Stats Panel ── */
+function StatsPanel({schedule,vac,curWeek}){
+  const [mode,setMode]=useState("week");
+  const [fromIdx,setFromIdx]=useState(0);
+  const [toIdx,setToIdx]=useState(ALL_DAYS.length-1);
+  const [selWeeks,setSelWeeks]=useState([curWeek]);
+  const {rFrom,rTo}=useMemo(()=>{
+    if(mode==="week"){const wd=WEEKS_MAP[curWeek]||[];return{rFrom:wd[0]?.idx||0,rTo:wd[wd.length-1]?.idx||0};}
+    if(mode==="2weeks"){const wn2=Math.min(curWeek+1,WEEK_NUMS[WEEK_NUMS.length-1]);const wd1=WEEKS_MAP[curWeek]||[],wd2=WEEKS_MAP[wn2]||[];const all=[...wd1,...wd2];return{rFrom:all[0]?.idx||0,rTo:all[all.length-1]?.idx||0};}
+    if(mode==="multiweek"){const allD=selWeeks.flatMap(wn=>WEEKS_MAP[wn]||[]).sort((a,b)=>a.idx-b.idx);return{rFrom:allD[0]?.idx||0,rTo:allD[allD.length-1]?.idx||0};}
+    return{rFrom:fromIdx,rTo:toIdx};
+  },[mode,curWeek,fromIdx,toIdx,selWeeks]);
+  const counts=useMemo(()=>getRangeCounts(schedule,rFrom,rTo,vac),[schedule,rFrom,rTo,vac]);
+  const maxC=Math.max(...Object.values(counts),1);
+  const fairShare=(rTo-rFrom+1)*4/EMPLOYEES.length;
+  function toggleWeek(wn){setSelWeeks(p=>p.includes(wn)?p.filter(x=>x!==wn):[...p,wn]);}
+  return(
+    <div style={{background:"white",borderRadius:"12px",boxShadow:"0 2px 8px rgba(0,0,0,0.07)",padding:"14px"}}>
+      <div style={{fontSize:"14px",fontWeight:800,marginBottom:"10px"}}>📊 عداد الـ OnCall</div>
+      <div style={{display:"flex",gap:"4px",marginBottom:"10px",background:"#f3f4f6",borderRadius:"8px",padding:"3px"}}>
+        {[{k:"week",l:"أسبوع"},{k:"2weeks",l:"أسبوعان"},{k:"multiweek",l:"أسابيع"},{k:"range",l:"فترة"}].map(m=>(
+          <button key={m.k} onClick={()=>setMode(m.k)}
+            style={{flex:1,padding:"5px 2px",borderRadius:"6px",border:"none",fontSize:"11px",fontWeight:mode===m.k?700:400,background:mode===m.k?"white":"transparent",color:mode===m.k?"#0d7a5f":"#6b7280",boxShadow:mode===m.k?"0 1px 3px rgba(0,0,0,0.1)":"none"}}>
+            {m.l}
+          </button>
+        ))}
+      </div>
+      {mode==="range"&&(
+        <div style={{marginBottom:"10px",display:"flex",flexDirection:"column",gap:"6px"}}>
+          <select value={fromIdx} onChange={e=>setFromIdx(Number(e.target.value))} style={{width:"100%",padding:"6px 10px",borderRadius:"7px",border:"1.5px solid #e5e7eb",fontSize:"11px",color:"#374151"}}>
+            {ALL_DAYS.map(d=><option key={d.idx} value={d.idx}>{d.day} {d.month} – {d.dayShort}</option>)}
+          </select>
+          <div style={{textAlign:"center",fontSize:"11px",color:"#9ca3af"}}>إلى</div>
+          <select value={toIdx} onChange={e=>setToIdx(Number(e.target.value))} style={{width:"100%",padding:"6px 10px",borderRadius:"7px",border:"1.5px solid #e5e7eb",fontSize:"11px",color:"#374151"}}>
+            {ALL_DAYS.filter(d=>d.idx>=fromIdx).map(d=><option key={d.idx} value={d.idx}>{d.day} {d.month} – {d.dayShort}</option>)}
+          </select>
+        </div>
+      )}
+      {mode==="multiweek"&&(
+        <div style={{marginBottom:"10px",display:"flex",gap:"4px",flexWrap:"wrap"}}>
+          {WEEK_NUMS.map(wn=>(
+            <button key={wn} onClick={()=>toggleWeek(wn)}
+              style={{padding:"4px 8px",borderRadius:"6px",border:`1.5px solid ${selWeeks.includes(wn)?"#0d7a5f":"#e5e7eb"}`,background:selWeeks.includes(wn)?"#daf0e8":"white",color:selWeeks.includes(wn)?"#0d7a5f":"#555",fontSize:"11px",fontWeight:selWeeks.includes(wn)?700:400}}>
+              أ{wn}
+            </button>
+          ))}
+        </div>
+      )}
+      <div style={{fontSize:"10px",color:"#9ca3af",marginBottom:"10px",padding:"5px 8px",background:"#f9fafb",borderRadius:"6px"}}>
+        {ALL_DAYS[rFrom]?.day} {ALL_DAYS[rFrom]?.month} – {ALL_DAYS[rTo]?.day} {ALL_DAYS[rTo]?.month} • متوسط: <strong style={{color:"#0d7a5f"}}>{fairShare.toFixed(1)}</strong>
+      </div>
+      {EMPLOYEES.map(emp=>{
+        const cnt=counts[emp],over=cnt>fairShare+0.5,hasV=(vac[emp]||[]).length>0;
+        const pct=maxC>0?(cnt/maxC)*100:0;
+        return(
+          <div key={emp} style={{marginBottom:"8px"}}>
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"3px"}}>
+              <div style={{display:"flex",alignItems:"center",gap:"3px"}}>
+                <span style={{fontSize:"11px",color:"#374151",fontWeight:500}}>{fn(emp)}</span>
+                {hasV&&<span style={{fontSize:"10px"}}>🏖️</span>}
+              </div>
+              <span style={{fontSize:"11px",fontWeight:800,color:over?"#d97706":"#0d7a5f",background:over?"#fef3c7":"#daf0e8",padding:"1px 6px",borderRadius:5}}>
+                {cnt%1===0?cnt:cnt.toFixed(1)}
+              </span>
+            </div>
+            <div style={{height:5,background:"#f3f4f6",borderRadius:3,overflow:"hidden"}}>
+              <div style={{width:`${pct}%`,height:"100%",background:over?"#f59e0b":"#0d7a5f",borderRadius:3,transition:"width 0.35s"}}/>
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+/* ── localStorage helpers ── */
+const LS_KEY='oncall_v1';
+function loadLS(){try{const d=localStorage.getItem(LS_KEY);return d?JSON.parse(d):null;}catch(e){return null;}}
+function saveLS(data){try{localStorage.setItem(LS_KEY,JSON.stringify(data));}catch(e){}}
+
+/* ── Main App ── */
+function App(){
+  const [vac,setVac]=useState(()=>{const s=loadLS();return s?.vac||{};});
+  const [schedule,setSchedule]=useState(()=>{const s=loadLS();return s?.schedule||buildInit({});});
+  const [selDay,setSelDay]=useState(()=>{const s=loadLS();return s?.selDay||0;});
+  const [curWeek,setCurWeek]=useState(()=>{const s=loadLS();return s?.curWeek||1;});
+  const [showVac,setShowVac]=useState(false);
+  const [showPdf,setShowPdf]=useState(false);
+  const [clinicAssignments,setClinicAssignments]=useState(()=>{const s=loadLS();return s?.clinicAssignments||{};});
+  const [savedMsg,setSavedMsg]=useState(false);
+
+  React.useEffect(()=>{
+    saveLS({vac,schedule,selDay,curWeek,clinicAssignments});
+    setSavedMsg(true);
+    const t=setTimeout(()=>setSavedMsg(false),1800);
+    return()=>clearTimeout(t);
+  },[vac,schedule,selDay,curWeek,clinicAssignments]);
+
+  function saveVac(nv){setVac(nv);setSchedule(buildInit(nv));}
+  function resetAll(){
+    if(!window.confirm('هل تريد مسح جميع البيانات والبدء من جديد؟')) return;
+    localStorage.removeItem(LS_KEY);
+    setVac({});setSchedule(buildInit({}));setSelDay(0);setCurWeek(1);setClinicAssignments({});
+  }
+
+  const day=schedule[selDay];
+  const needed=day.managerPresent?5:4;
+  const oncallSet=new Set(day.oncall);
+  const availToday=EMPLOYEES.filter(e=>isPresent(e,selDay,vac));
+  const clinicStaff=availToday.filter(e=>!oncallSet.has(e));
+  const vacToday=EMPLOYEES.filter(e=>!isPresent(e,selDay,vac));
+  const prev=new Set(selDay>0?(schedule[selDay-1]?.oncall||[]):[]);
+  const cntBefore=useMemo(()=>getEffectiveCounts(schedule,selDay,vac),[schedule,selDay,vac]);
+  const slotsBefore=useMemo(()=>{let t=0;for(let d=0;d<selDay;d++)t+=schedule[d]?.managerPresent?5:4;return t;},[schedule,selDay]);
+  const avgBefore=slotsBefore/14;
+  const warn=emp=>prev.has(emp)?"red":cntBefore[emp]>avgBefore+1?"yellow":"green";
+  const remove=emp=>setSchedule(s=>({...s,[selDay]:{...s[selDay],oncall:s[selDay].oncall.filter(e=>e!==emp)}}));
+  const add=emp=>{if(!oncallSet.has(emp)&&day.oncall.length<needed)setSchedule(s=>({...s,[selDay]:{...s[selDay],oncall:[...s[selDay].oncall,emp]}}));};
+  function toggleManager(){
+    const np=!day.managerPresent;
+    const tmp={...schedule,[selDay]:{...day,managerPresent:np}};
+    setSchedule(s=>({...s,[selDay]:{...s[selDay],managerPresent:np,oncall:suggest(selDay,tmp,np,vac)}}));
+  }
+  function resetDay(){setSchedule(s=>({...s,[selDay]:{...s[selDay],oncall:suggest(selDay,s,s[selDay].managerPresent,vac)}}));}
+
+  const clinicAssignDay=clinicAssignments[selDay]||{};
+  function setClinicAssignDay(assign){setClinicAssignments(prev=>({...prev,[selDay]:assign}));}
+
+  const weekDays=WEEKS_MAP[curWeek]||[];
+  const redW=day.oncall.filter(e=>warn(e)==="red");
+  const yelW=day.oncall.filter(e=>warn(e)==="yellow");
+  const oncallFull=day.oncall.length===needed;
+  const totalVacDays=Object.values(vac).reduce((s,a)=>s+a.length,0);
+  const selDayInfo=ALL_DAYS[selDay];
+  const cycleWeek=((curWeek-1)%7)+1;
+  const card={background:"white",borderRadius:"12px",boxShadow:"0 2px 8px rgba(0,0,0,0.07)",padding:"14px"};
+
+  return(
+    <div style={{fontFamily:"'Tajawal',sans-serif",minHeight:"100vh",background:"#eef7f4",padding:"12px"}}>
+      {showVac&&<VacModal vac={vac} onSave={saveVac} onClose={()=>setShowVac(false)}/>}
+      {showPdf&&<PdfModal schedule={schedule} vac={vac} clinicAssignments={clinicAssignments} onClose={()=>setShowPdf(false)}/>}
+
+      {/* Header */}
+      <div style={{background:"linear-gradient(135deg,#0d7a5f,#0fa872)",color:"white",borderRadius:"14px",padding:"14px 18px",marginBottom:"12px",display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:"10px"}}>
+        <div>
+          <div style={{fontSize:"18px",fontWeight:800}}>🦷 جدول مناوبة الاتصال</div>
+          <div style={{fontSize:"11px",opacity:.75,marginTop:"3px"}}>قسم صحة الفم والأسنان • 4:00م – 11:00م • 10 عيادات</div>
+        </div>
+        <div style={{display:"flex",gap:"8px",alignItems:"center",flexWrap:"wrap"}}>
+          <button onClick={()=>setShowVac(true)}
+            style={{background:"rgba(255,255,255,0.2)",border:"1.5px solid rgba(255,255,255,0.4)",borderRadius:"9px",padding:"8px 14px",color:"white",fontSize:"13px",fontWeight:700,display:"flex",alignItems:"center",gap:"6px"}}>
+            🏖️ إجازات {totalVacDays>0&&<span style={{background:"#fbbf24",color:"#1a1a1a",borderRadius:"10px",padding:"1px 7px",fontSize:"11px",fontWeight:800}}>{totalVacDays}</span>}
+          </button>
+          <button onClick={()=>setShowPdf(true)} style={{background:"rgba(255,255,255,0.2)",border:"1.5px solid rgba(255,255,255,0.4)",borderRadius:"9px",padding:"8px 14px",color:"white",fontSize:"13px",fontWeight:700}}>🖨️ PDF</button>
+          <button onClick={resetAll} title="مسح جميع البيانات" style={{background:"rgba(255,255,255,0.1)",border:"1.5px solid rgba(255,255,255,0.25)",borderRadius:"9px",padding:"8px 12px",color:"rgba(255,255,255,0.7)",fontSize:"13px"}}>🗑️</button>
+          {savedMsg&&<span style={{fontSize:"11px",color:"rgba(255,255,255,0.85)",background:"rgba(0,0,0,0.2)",borderRadius:"7px",padding:"4px 9px",whiteSpace:"nowrap"}}>✓ محفوظ</span>}          {[{n:EMPLOYEES.length,l:"موظف"},{n:ALL_DAYS.length,l:"يوم"}].map(({n,l})=>(
+            <div key={l} style={{textAlign:"center",background:"rgba(255,255,255,0.15)",borderRadius:"10px",padding:"7px 13px"}}>
+              <div style={{fontSize:"20px",fontWeight:800}}>{n}</div><div style={{fontSize:"10px",opacity:.8}}>{l}</div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Week nav */}
+      <div style={{...card,marginBottom:"12px",padding:"12px 16px"}}>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"10px"}}>
+          <button onClick={()=>{if(curWeek>1){const pw=curWeek-1;setCurWeek(pw);setSelDay(WEEKS_MAP[pw][WEEKS_MAP[pw].length-1].idx);}}}
+            disabled={curWeek===1} style={{background:curWeek===1?"#f3f4f6":"#0d7a5f",color:curWeek===1?"#ccc":"white",border:"none",borderRadius:"8px",padding:"7px 14px",fontSize:"13px",fontWeight:700,opacity:curWeek===1?.5:1}}>
+            ＜ السابق
+          </button>
+          <div style={{textAlign:"center"}}>
+            <div style={{fontSize:"15px",fontWeight:800,color:"#0d7a5f"}}>الأسبوع {curWeek} <span style={{fontSize:"11px",fontWeight:400,color:"#9ca3af"}}>({[...new Set((WEEKS_MAP[curWeek]||[]).map(d=>d.month))].join(" – ")})</span></div>
+            <div style={{fontSize:"12px",color:"#6b7280",marginTop:"2px"}}>{weekDateRange(curWeek)}</div>
+            <div style={{marginTop:"5px",display:"flex",alignItems:"center",gap:"8px",justifyContent:"center"}}>
+              <span style={{fontSize:"10px",color:"#9ca3af"}}>دورة {cycleWeek}/7</span>
+              <div style={{width:70,height:4,background:"#e5e7eb",borderRadius:2,overflow:"hidden"}}>
+                <div style={{width:`${Math.round(cycleWeek/7*100)}%`,height:"100%",background:"#0d7a5f",borderRadius:2}}/>
+              </div>
+            </div>
+          </div>
+          <button onClick={()=>{if(curWeek<WEEK_NUMS.length){const nw=curWeek+1;setCurWeek(nw);setSelDay(WEEKS_MAP[nw][0].idx);}}}
+            disabled={curWeek===WEEK_NUMS.length} style={{background:curWeek===WEEK_NUMS.length?"#f3f4f6":"#0d7a5f",color:curWeek===WEEK_NUMS.length?"#ccc":"white",border:"none",borderRadius:"8px",padding:"7px 14px",fontSize:"13px",fontWeight:700,opacity:curWeek===WEEK_NUMS.length?.5:1}}>
+            التالي ＞
+          </button>
+        </div>
+        <div style={{display:"flex",gap:"6px"}}>
+          {weekDays.map(d=>{
+            const ds=schedule[d.idx];
+            const dprev=new Set(d.idx>0?(schedule[d.idx-1]?.oncall||[]):[]);
+            const hasRed=(ds?.oncall||[]).some(e=>dprev.has(e));
+            const incomplete=(ds?.oncall||[]).length<(ds?.managerPresent?5:4);
+            const vacCnt=EMPLOYEES.filter(e=>!isPresent(e,d.idx,vac)).length;
+            const isSel=selDay===d.idx;
+            const assign=clinicAssignments[d.idx]||{};
+            const assignedCount=Object.keys(assign).length;
+            return(
+              <button key={d.idx} onClick={()=>setSelDay(d.idx)}
+                style={{flex:1,padding:"8px 4px",borderRadius:"10px",border:`2px solid ${isSel?"#0d7a5f":"#e5e7eb"}`,background:isSel?"#daf0e8":"white",color:isSel?"#0d7a5f":"#555",position:"relative",boxShadow:isSel?"0 2px 8px rgba(13,122,95,0.2)":"none",transition:"all 0.15s",lineHeight:1.3}}>
+                <div style={{fontSize:"12px",fontWeight:isSel?800:500}}>{d.dayShort}</div>
+                <div style={{fontSize:"13px",fontWeight:700,marginTop:"2px",color:isSel?"#0d7a5f":"#374151"}}>{d.day}</div>
+                <div style={{fontSize:"10px",opacity:.7}}>{d.month}</div>
+                {(hasRed||incomplete)&&<span style={{position:"absolute",top:-3,right:-3,width:9,height:9,borderRadius:"50%",background:incomplete?"#ef4444":"#f59e0b",border:"2px solid #eef7f4"}}/>}
+                {vacCnt>0&&<div style={{fontSize:"10px",color:isSel?"#0d7a5f":"#d97706",marginTop:"1px"}}>🏖️{vacCnt}</div>}
+                {assignedCount>0&&<div style={{fontSize:"10px",color:isSel?"#0d7a5f":"#6b7280",marginTop:"1px"}}>ع{assignedCount}</div>}
+              </button>
+            );
+          })}
+        </div>
+        {selDayInfo&&(
+          <div style={{marginTop:"10px",paddingTop:"10px",borderTop:"1px dashed #e5e7eb",textAlign:"center",color:"#0d7a5f",fontWeight:700,fontSize:"13px"}}>
+            📅 {selDayInfo.dayName} {selDayInfo.day} {selDayInfo.month} {selDayInfo.year}
+          </div>
+        )}
+      </div>
+
+      {/* Warnings */}
+      {(redW.length>0||yelW.length>0)&&(
+        <div style={{borderRadius:"9px",padding:"10px 14px",marginBottom:"10px",fontSize:"13px",background:redW.length>0?"#fff1f2":"#fefce8",border:`1.5px solid ${redW.length>0?"#fca5a5":"#fde047"}`}}>
+          {redW.length>0&&<div style={{color:"#b91c1c",fontWeight:600}}>📵 <strong>{redW.map(fn).join("، ")}</strong> كانوا على الاتصال أمس!</div>}
+          {yelW.length>0&&<div style={{color:"#a16207",marginTop:redW.length?"4px":"0"}}>⚠️ <strong>{yelW.map(fn).join("، ")}</strong> تجاوزوا متوسط أيام الاتصال</div>}
+        </div>
+      )}
+      {vacToday.length>0&&(
+        <div style={{borderRadius:"9px",padding:"10px 14px",marginBottom:"10px",background:"#fefce8",border:"1.5px solid #fde047",fontSize:"12px",color:"#a16207"}}>
+          🏖️ <strong>غائبون ({vacToday.length}):</strong> {vacToday.map(fn).join("، ")} <span style={{opacity:.7}}>— رصيدهم محسوب بالمتوسط</span>
+        </div>
+      )}
+
+      <div style={{display:"grid",gridTemplateColumns:"1fr 252px",gap:"12px"}}>
+        {/* LEFT */}
+        <div style={{display:"flex",flexDirection:"column",gap:"10px"}}>
+          {/* Manager */}
+          <div style={{...card,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+            <div style={{display:"flex",alignItems:"center",gap:"11px"}}>
+              <div style={{width:40,height:40,borderRadius:"50%",background:"#daf0e8",display:"flex",alignItems:"center",justifyContent:"center",fontSize:20}}>👨‍⚕️</div>
+              <div><div style={{fontSize:"14px",fontWeight:700}}>أ. {MANAGER}</div><div style={{fontSize:"11px",color:"#9ca3af"}}>رئيس القسم</div></div>
+            </div>
+            <div style={{display:"flex",alignItems:"center",gap:"10px"}}>
+              <span style={{fontSize:"12px",fontWeight:day.managerPresent?600:400,color:day.managerPresent?"#0d7a5f":"#aaa"}}>{day.managerPresent?"✅ يحضر للعيادة":"يحضر للعيادة؟"}</span>
+              <div onClick={toggleManager} style={{width:46,height:26,borderRadius:13,background:day.managerPresent?"#0d7a5f":"#d1d5db",cursor:"pointer",position:"relative",transition:"background 0.25s"}}>
+                <div style={{position:"absolute",top:3,right:day.managerPresent?3:21,width:20,height:20,borderRadius:"50%",background:"white",transition:"right 0.25s",boxShadow:"0 1px 4px rgba(0,0,0,0.25)"}}/>
+              </div>
+            </div>
+          </div>
+
+          {/* OnCall */}
+          <div style={card}>
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"12px"}}>
+              <div style={{display:"flex",alignItems:"center",gap:"9px"}}>
+                <span style={{fontSize:"15px",fontWeight:800,color:"#0d7a5f"}}>📞 على الاتصال</span>
+                <span style={{padding:"3px 11px",borderRadius:20,fontSize:"13px",fontWeight:700,background:oncallFull?"#daf0e8":"#fee2e2",color:oncallFull?"#0d7a5f":"#b91c1c",border:`1.5px solid ${oncallFull?"#86efac":"#fca5a5"}`}}>
+                  {day.oncall.length}/{needed}
+                </span>
+              </div>
+              <button onClick={resetDay} style={{background:"#f3f4f6",border:"1px solid #e5e7eb",borderRadius:"7px",padding:"5px 12px",fontSize:"12px",color:"#555",fontWeight:600}}>🔄 اقتراح تلقائي</button>
+            </div>
+            <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(118px,1fr))",gap:"8px"}}>
+              {day.oncall.map(emp=>{const w=warn(emp),c=WC[w];return(
+                <div key={emp} onClick={()=>remove(emp)}
+                  style={{background:c.bg,border:`2px solid ${c.border}`,borderRadius:"10px",padding:"10px 12px",cursor:"pointer",transition:"transform 0.1s",userSelect:"none"}}
+                  onMouseEnter={e=>e.currentTarget.style.transform="scale(0.97)"}
+                  onMouseLeave={e=>e.currentTarget.style.transform="scale(1)"}>
+                  <div style={{display:"flex",justifyContent:"space-between",marginBottom:"4px"}}>
+                    <div style={{width:8,height:8,borderRadius:"50%",background:c.dot,marginTop:2}}/><span style={{fontSize:"10px",color:c.text}}>✕</span>
+                  </div>
+                  <div style={{fontSize:"13px",fontWeight:700,color:"#1a1a1a"}}>{fn(emp)}</div>
+                  <div style={{fontSize:"10px",color:c.text,marginTop:"3px"}}>{c.tag}</div>
+                </div>
+              );})}
+              {Array.from({length:Math.max(0,needed-day.oncall.length)}).map((_,i)=>(
+                <div key={i} style={{background:"#f9fafb",border:"2px dashed #d1d5db",borderRadius:"10px",padding:"10px",display:"flex",alignItems:"center",justifyContent:"center",minHeight:66}}>
+                  <span style={{color:"#d1d5db",fontSize:"12px"}}>+ أضف موظفاً</span>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Clinic Grid */}
+          <ClinicGrid
+            clinicStaff={clinicStaff}
+            vacToday={vacToday}
+            managerPresent={day.managerPresent}
+            oncallCount={day.oncall.length}
+            needed={needed}
+            clinicAssign={clinicAssignDay}
+            setClinicAssign={setClinicAssignDay}
+            onAdd={add}
+            onMoveToOncall={emp=>{add(emp);}}
+          />
+        </div>
+
+        {/* RIGHT */}
+        <div style={{display:"flex",flexDirection:"column",gap:"10px"}}>
+          <StatsPanel schedule={schedule} vac={vac} curWeek={curWeek}/>
+          <div style={card}>
+            <div style={{fontSize:"12px",fontWeight:800,color:"#374151",marginBottom:"9px"}}>🔑 دليل التحذيرات</div>
+            {Object.entries(WC).map(([k,c])=>(
+              <div key={k} style={{display:"flex",alignItems:"center",gap:"8px",marginBottom:"7px"}}>
+                <div style={{width:13,height:13,borderRadius:3,background:c.bg,border:`2px solid ${c.border}`,flexShrink:0}}/><span style={{fontSize:"11px",color:"#4b5563"}}>{c.tag}</span>
+              </div>
+            ))}
+            <div style={{marginTop:"7px",padding:"8px",background:"#fef9e7",borderRadius:"7px",border:"1px solid #fde68a"}}>
+              <div style={{fontSize:"11px",color:"#a16207",fontWeight:600,marginBottom:"3px"}}>🏥 العيادات</div>
+              <div style={{fontSize:"10px",color:"#92400e",lineHeight:1.5}}>اضغط اسم الطبيب أو خانة العيادة لتعيين الرقم</div>
+            </div>
+          </div>
+          <div style={{...card,background:"linear-gradient(135deg,#0d7a5f,#0fa872)",color:"white"}}>
+            <div style={{fontSize:"12px",fontWeight:800,marginBottom:"6px",opacity:.9}}>⏱ الدورة الكاملة</div>
+            <div style={{fontSize:"11px",opacity:.8,lineHeight:1.8}}><div>كل <strong style={{fontSize:"13px"}}>7 أسابيع</strong> = دورة</div><div>10 أيام oncall / موظف</div></div>
+            <div style={{marginTop:"8px",height:5,background:"rgba(255,255,255,0.25)",borderRadius:3,overflow:"hidden"}}>
+              <div style={{width:`${Math.round(cycleWeek/7*100)}%`,height:"100%",background:"white",borderRadius:3}}/>
+            </div>
+            <div style={{fontSize:"10px",opacity:.7,marginTop:"4px"}}>أسبوع {cycleWeek} من 7</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
+</script>
+</body>
+</html>
