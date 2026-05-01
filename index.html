@@ -1,0 +1,1266 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>جدول مناوبة الاتصال – قسم صحة الفم والأسنان</title>
+<link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;800&display=swap" rel="stylesheet"/>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Tajawal',sans-serif;background:#eef7f4;min-height:100vh;padding:12px;font-size:14px}
+button{font-family:'Tajawal',sans-serif;cursor:pointer}
+input,textarea,select{font-family:'Tajawal',sans-serif;direction:rtl;unicode-bidi:plaintext}
+::-webkit-scrollbar{width:5px}
+::-webkit-scrollbar-thumb{background:#0d7a5f55;border-radius:3px}
+.card{background:white;border-radius:12px;box-shadow:0 2px 8px rgba(0,0,0,.07);padding:14px}
+.btn-green{background:#0d7a5f;color:white;border:none;border-radius:9px;padding:10px 16px;font-size:13px;font-weight:700}
+.btn-gray{background:#f3f4f6;color:#555;border:none;border-radius:9px;padding:10px 16px;font-size:13px}
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:900;display:flex;align-items:center;justify-content:center;padding:16px}
+.modal-box{background:white;border-radius:16px;width:100%;max-width:560px;max-height:88vh;display:flex;flex-direction:column;box-shadow:0 20px 60px rgba(0,0,0,.25)}
+.modal-header{padding:16px 20px;border-bottom:1px solid #e5e7eb;display:flex;justify-content:space-between;align-items:center;flex-shrink:0}
+.modal-body{overflow:auto;padding:14px 20px;flex:1}
+.modal-footer{padding:14px 20px;border-top:1px solid #e5e7eb;display:flex;gap:10px;flex-shrink:0}
+.hidden{display:none!important}
+/* shift pair card */
+.shift-pair-wrap{background:#fffbeb;border:2px solid #fcd34d;border-radius:12px;padding:10px;display:flex;flex-direction:column;gap:7px;position:relative}
+.shift-pair-label{position:absolute;top:-10px;right:12px;background:#f59e0b;color:white;font-size:10px;font-weight:800;border-radius:10px;padding:2px 8px}
+.shift-solo-card{background:#fff8e1;border:2px dashed #fcd34d;border-radius:10px;padding:9px 11px}
+.full-card{background:#f0fdf4;border:2px solid #6ee7b7;border-radius:10px;padding:9px 11px}
+.full-card-empty{background:#f8fafc;border:2px solid #e2e8f0;border-radius:10px;padding:9px 11px}
+@media print{
+  body{background:white!important;padding:0!important}
+  #main-app,#loading-screen,#vac-modal,#pdf-modal,#clinic-picker,#settings-modal,#pair-picker,#copy-modal,#coverage-picker{display:none!important}
+  #print-area{display:block!important}
+  @page{margin:8mm;size:A4}
+}
+#print-area{display:none}
+#loading-screen{position:fixed;inset:0;background:#eef7f4;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;z-index:999}
+</style>
+</head>
+<body>
+
+<div id="loading-screen">
+  <div style="font-size:44px">🦷</div>
+  <div style="font-size:16px;font-weight:700;color:#0d7a5f">جاري تحميل الجدول...</div>
+  <div style="font-size:12px;color:#9ca3af">يتصل بـ Firebase</div>
+</div>
+
+<div id="main-app" class="hidden"></div>
+<div id="print-area"></div>
+
+<!-- VAC MODAL -->
+<div id="vac-modal" class="modal-overlay hidden">
+  <div class="modal-box">
+    <div class="modal-header">
+      <div><div style="font-size:16px;font-weight:800;color:#0d7a5f">🏖️ إدارة الإجازات</div><div style="font-size:11px;color:#9ca3af;margin-top:2px">حدد أيام الغياب لكل موظف</div></div>
+      <button onclick="closeVacModal()" style="background:#f3f4f6;border:none;border-radius:8px;width:32px;height:32px;font-size:16px;color:#6b7280">✕</button>
+    </div>
+    <div class="modal-body" id="vac-modal-body"></div>
+    <div class="modal-footer">
+      <button class="btn-green" style="flex:1" onclick="saveVacModal()">✅ حفظ وتحديث الجدول</button>
+      <button class="btn-gray" onclick="closeVacModal()">إلغاء</button>
+    </div>
+  </div>
+</div>
+
+<!-- PDF MODAL -->
+<div id="pdf-modal" class="modal-overlay hidden">
+  <div class="modal-box" style="max-width:600px;background:#f5f7fa">
+    <div class="modal-header" style="background:white;border-radius:16px 16px 0 0">
+      <div><div style="font-size:16px;font-weight:800;color:#0d7a5f">🖨️ تصدير PDF</div><div style="font-size:11px;color:#9ca3af;margin-top:2px">اختر الفترة وخصص التقرير</div></div>
+      <button onclick="closePdfModal()" style="background:#f3f4f6;border:none;border-radius:8px;width:32px;height:32px;font-size:16px;color:#6b7280">✕</button>
+    </div>
+    <div class="modal-body" id="pdf-modal-body"></div>
+    <div class="modal-footer" style="background:white;border-radius:0 0 16px 16px">
+      <button class="btn-green" style="flex:1;font-size:14px;font-weight:800" onclick="doPrint()">🖨️ طباعة / حفظ PDF</button>
+      <button class="btn-gray" onclick="closePdfModal()">إلغاء</button>
+    </div>
+  </div>
+</div>
+
+<!-- SETTINGS MODAL -->
+<div id="settings-modal" class="modal-overlay hidden">
+  <div class="modal-box" style="max-width:480px">
+    <div class="modal-header">
+      <div><div style="font-size:16px;font-weight:800;color:#0d7a5f">⚙️ إعدادات العيادات</div><div style="font-size:11px;color:#9ca3af;margin-top:2px">تخصيص أسماء العيادات</div></div>
+      <button onclick="closeSettingsModal()" style="background:#f3f4f6;border:none;border-radius:8px;width:32px;height:32px;font-size:16px;color:#6b7280">✕</button>
+    </div>
+    <div class="modal-body" id="settings-modal-body"></div>
+    <div class="modal-footer">
+      <button class="btn-green" style="flex:1" onclick="saveSettingsModal()">✅ حفظ</button>
+      <button class="btn-gray" onclick="closeSettingsModal()">إلغاء</button>
+    </div>
+  </div>
+</div>
+
+<!-- CLINIC PICKER -->
+<div id="clinic-picker" class="modal-overlay hidden">
+  <div style="background:white;border-radius:14px;padding:16px 20px;box-shadow:0 10px 40px rgba(0,0,0,.2);min-width:300px;max-width:380px;width:100%">
+    <div style="font-size:14px;font-weight:800;color:#0d7a5f;margin-bottom:4px" id="clinic-picker-title">🏥 تعيين عيادة</div>
+    <div id="clinic-picker-label" style="font-size:12px;color:#6b7280;margin-bottom:10px"></div>
+    <div id="clinic-picker-tabs" style="display:flex;gap:6px;margin-bottom:12px;background:#f3f4f6;border-radius:8px;padding:3px"></div>
+    <div id="clinic-picker-grid" style="display:grid;grid-template-columns:repeat(5,1fr);gap:7px;margin-bottom:12px"></div>
+    <button id="clinic-picker-remove" onclick="clinicPickerRemove()" style="width:100%;padding:7px;background:#fee2e2;color:#b91c1c;border:none;border-radius:8px;font-size:12px;font-weight:600;margin-bottom:8px;font-family:'Tajawal',sans-serif;cursor:pointer" class="hidden">✕ إزالة التعيين</button>
+    <button onclick="closeClinicPicker()" style="width:100%;padding:8px;background:#f3f4f6;color:#555;border:none;border-radius:8px;font-size:13px;font-family:'Tajawal',sans-serif;cursor:pointer">إغلاق</button>
+  </div>
+</div>
+
+<!-- SHIFT PAIR PICKER -->
+<div id="pair-picker" class="modal-overlay hidden">
+  <div style="background:white;border-radius:14px;padding:16px 20px;box-shadow:0 10px 40px rgba(0,0,0,.2);min-width:280px;max-width:340px;width:100%">
+    <div style="font-size:14px;font-weight:800;color:#f59e0b;margin-bottom:4px">🔗 ربط شريك الشيفت</div>
+    <div id="pair-picker-label" style="font-size:12px;color:#6b7280;margin-bottom:12px"></div>
+    <div id="pair-picker-list" style="display:flex;flex-direction:column;gap:7px;margin-bottom:12px;max-height:300px;overflow:auto"></div>
+    <button onclick="closePairPicker()" style="width:100%;padding:8px;background:#f3f4f6;color:#555;border:none;border-radius:8px;font-size:13px;font-family:'Tajawal',sans-serif;cursor:pointer">إغلاق</button>
+  </div>
+</div>
+
+<!-- COVERAGE PICKER -->
+<div id="coverage-picker" class="modal-overlay hidden">
+  <div style="background:white;border-radius:14px;padding:16px 20px;box-shadow:0 10px 40px rgba(0,0,0,.2);min-width:280px;max-width:340px;width:100%">
+    <div style="font-size:14px;font-weight:800;color:#1e40af;margin-bottom:4px">🔄 يغطي عيادة</div>
+    <div id="coverage-picker-label" style="font-size:12px;color:#6b7280;margin-bottom:12px"></div>
+    <div id="coverage-picker-list" style="display:flex;flex-direction:column;gap:6px;margin-bottom:10px;max-height:320px;overflow:auto"></div>
+    <button id="coverage-picker-remove" onclick="removeCoverage()" class="hidden" style="width:100%;padding:7px;background:#fee2e2;color:#b91c1c;border:none;border-radius:8px;font-size:12px;font-weight:600;margin-bottom:8px;font-family:'Tajawal',sans-serif;cursor:pointer">✕ إزالة التغطية</button>
+    <button onclick="closeCoveragePicker()" style="width:100%;padding:8px;background:#f3f4f6;color:#555;border:none;border-radius:8px;font-size:13px;font-family:'Tajawal',sans-serif;cursor:pointer">إغلاق</button>
+  </div>
+</div>
+
+<!-- COPY DAY MODAL -->
+<div id="copy-modal" class="modal-overlay hidden">
+  <div class="modal-box" style="max-width:460px">
+    <div class="modal-header">
+      <div><div style="font-size:16px;font-weight:800;color:#0d7a5f">📋 نسخ جدول اليوم</div><div style="font-size:11px;color:#9ca3af;margin-top:2px" id="copy-modal-sub"></div></div>
+      <button onclick="closeCopyModal()" style="background:#f3f4f6;border:none;border-radius:8px;width:32px;height:32px;font-size:16px;color:#6b7280">✕</button>
+    </div>
+    <div class="modal-body" id="copy-modal-body"></div>
+    <div class="modal-footer">
+      <button class="btn-green" style="flex:1" id="copy-confirm-btn" onclick="executeCopy()">📋 نسخ للأيام المحددة</button>
+      <button class="btn-gray" onclick="closeCopyModal()">إلغاء</button>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ════════════════════════════════════════
+   CONSTANTS
+════════════════════════════════════════ */
+const EMPLOYEES=[
+  "وضحى العتيبي","زريفة العنزي","سلمى الكناني","ختام المرشد",
+  "منيفة المطيري","سارة الشهراني","سلطانة الايداء","نوال الطياوي",
+  "فاطمة الحربي","حجاب العنزي","حمدان العتيبي","ماجد الجبرين",
+  "محمد الدوسري","ثامر العثمان"
+];
+const MANAGER="زياد الحربي";
+const CLINIC_NUMS=[8,9,13,14,15,16,17,18,19,20];
+const AR_DAYS=["الأحد","الاثنين","الثلاثاء","الأربعاء","الخميس","الجمعة","السبت"];
+const AR_DAYS_S=["أحد","اثنين","ثلاثاء","أربعاء","خميس","جمعة","سبت"];
+const AR_MONTHS=["يناير","فبراير","مارس","أبريل","مايو","يونيو","يوليو","أغسطس","سبتمبر","أكتوبر","نوفمبر","ديسمبر"];
+const fn=n=>n.split(" ")[0];
+
+/* ════════════════════════════════════════
+   FIREBASE
+════════════════════════════════════════ */
+const FB_URL='https://oncall-schedule-cfbf3-default-rtdb.europe-west1.firebasedatabase.app/data.json';
+async function fbLoad(){
+  try{
+    const ctrl=new AbortController();
+    const tid=setTimeout(()=>ctrl.abort(),8000);
+    const r=await fetch(FB_URL,{signal:ctrl.signal});
+    clearTimeout(tid);
+    if(!r.ok)return null;
+    return await r.json();
+  }catch(e){return null;}
+}
+async function fbSave(data){
+  try{await fetch(FB_URL,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify(data)});}catch(e){}
+}
+
+/* ════════════════════════════════════════
+   GENERATE DAYS
+════════════════════════════════════════ */
+function generateAllDays(numWeeks=9){
+  const days=[];const d=new Date(2026,2,25);
+  let weekNum=1,idx=0;
+  while(weekNum<=numWeeks){
+    const dow=d.getDay();
+    if(dow===0&&idx>0){weekNum++;if(weekNum>numWeeks)break;}
+    if(dow<=4){
+      days.push({date:new Date(d),dayName:AR_DAYS[dow],dayShort:AR_DAYS_S[dow],
+        weekNum,idx:idx++,day:d.getDate(),month:AR_MONTHS[d.getMonth()],
+        monthNum:d.getMonth(),year:d.getFullYear()});
+    }
+    d.setDate(d.getDate()+1);
+  }
+  return days;
+}
+const ALL_DAYS=generateAllDays(9);
+function getWeeksMap(){const m={};ALL_DAYS.forEach(d=>{if(!m[d.weekNum])m[d.weekNum]=[];m[d.weekNum].push(d);});return m;}
+const WEEKS_MAP=getWeeksMap();
+const WEEK_NUMS=Object.keys(WEEKS_MAP).map(Number).sort((a,b)=>a-b);
+function weekDateRange(wn){
+  const days=WEEKS_MAP[wn];const f=days[0],l=days[days.length-1];
+  if(f.monthNum===l.monthNum)return`${f.day} – ${l.day} ${f.month} ${f.year}`;
+  return`${f.day} ${f.month} – ${l.day} ${l.month} ${f.year}`;
+}
+
+/* ════════════════════════════════════════
+   HELPERS
+════════════════════════════════════════ */
+function getClinicName(num){return(S.clinicNames&&S.clinicNames[num])||`ع${num}`;}
+function getOncallNeeded(dayIdx){
+  const day=S.schedule[dayIdx]||{};
+  if(S.oncallNeeded[dayIdx]!=null)return S.oncallNeeded[dayIdx];
+  return day.managerPresent?5:4;
+}
+function getEmpType(dayIdx,emp){return(S.empType[dayIdx]||{})[emp]||'full';}
+function getPairOf(dayIdx,emp){return(S.shiftPairs[dayIdx]||{})[emp]||null;}
+
+/* ════════════════════════════════════════
+   STATE
+════════════════════════════════════════ */
+let S={
+  vac:{},
+  schedule:{},
+  clinicAssign:{},    // {dayIdx:{empName:clinicNum}} primary
+  coverage:{},        // {dayIdx:{empName:clinicNum}} secondary
+  clinicNames:{},     // {8:'name',...}
+  empType:{},         // {dayIdx:{empName:'full'|'shift'}}
+  shiftPairs:{},      // {dayIdx:{emp1:emp2, emp2:emp1}}
+  oncallNeeded:{},    // {dayIdx:number}
+  empNotes:{},        // {dayIdx:{empName:'note'}}
+  selDay:0,
+  curWeek:1,
+  statsMode:'week',
+  statsFrom:0,
+  statsTo:ALL_DAYS.length-1,
+  statsSelWeeks:[1],
+  pdfPeriod:'week',
+  pdfSelIdx:0,
+  pdfNotes:'',
+  pdfHeader:'قسم صحة الفم والأسنان',
+  vacDraft:{},
+  vacOpenEmp:null,
+  pickerEmp:null,
+  pickerMode:'primary',
+  pairPickerEmp:null,
+  settingsDraft:{},
+  savedMsg:'',
+};
+
+/* ════════════════════════════════════════
+   SCHEDULE LOGIC
+════════════════════════════════════════ */
+function isPresent(emp,dayIdx){return!(S.vac[emp]||[]).includes(dayIdx);}
+
+function getEffectiveCounts(upTo){
+  const c={};EMPLOYEES.forEach(e=>c[e]=0);
+  for(let d=0;d<upTo;d++){
+    (S.schedule[d]?.oncall||[]).forEach(e=>{if(c[e]!==undefined)c[e]++;});
+    const absent=EMPLOYEES.filter(e=>!isPresent(e,d));
+    if(absent.length){
+      const need=getOncallNeeded(d);
+      const avg=(EMPLOYEES.length-absent.length)>0?need/(EMPLOYEES.length-absent.length):0;
+      absent.forEach(e=>{c[e]=(c[e]||0)+avg;});
+    }
+  }
+  return c;
+}
+
+function getRangeCounts(fromIdx,toIdx){
+  const c={};EMPLOYEES.forEach(e=>c[e]=0);
+  for(let d=fromIdx;d<=Math.min(toIdx,ALL_DAYS.length-1);d++){
+    (S.schedule[d]?.oncall||[]).forEach(e=>{if(c[e]!==undefined)c[e]++;});
+    const absent=EMPLOYEES.filter(e=>!isPresent(e,d));
+    if(absent.length){
+      const need=getOncallNeeded(d);
+      const avg=(EMPLOYEES.length-absent.length)>0?need/(EMPLOYEES.length-absent.length):0;
+      absent.forEach(e=>{c[e]=(c[e]||0)+avg;});
+    }
+  }
+  return c;
+}
+
+function suggest(dayIdx,managerPresent,scheduleRef){
+  const sch=scheduleRef||S.schedule;
+  const needed=managerPresent?5:4;
+  const c={};EMPLOYEES.forEach(e=>c[e]=0);
+  for(let d=0;d<dayIdx;d++){
+    (sch[d]?.oncall||[]).forEach(e=>{if(c[e]!==undefined)c[e]++;});
+    const absent=EMPLOYEES.filter(e=>!isPresent(e,d));
+    if(absent.length){
+      const need=sch[d]?.managerPresent?5:4;
+      const avg=(EMPLOYEES.length-absent.length)>0?need/(EMPLOYEES.length-absent.length):0;
+      absent.forEach(e=>{c[e]=(c[e]||0)+avg;});
+    }
+  }
+  const prev=new Set(dayIdx>0?(sch[dayIdx-1]?.oncall||[]):[]);
+  const prev2=new Set(dayIdx>1?(sch[dayIdx-2]?.oncall||[]):[]);
+  const consec=new Set([...prev].filter(e=>prev2.has(e)));
+  const avail=EMPLOYEES.filter(e=>isPresent(e,dayIdx));
+  const sorted=[...avail].sort((a,b)=>c[a]-c[b]||EMPLOYEES.indexOf(a)-EMPLOYEES.indexOf(b));
+  return[...sorted.filter(e=>!consec.has(e)),...sorted.filter(e=>consec.has(e))].slice(0,needed);
+}
+
+function buildInit(){
+  const s={};
+  for(let i=0;i<ALL_DAYS.length;i++)
+    s[i]={oncall:suggest(i,false,s),managerPresent:false};
+  return s;
+}
+
+/* ════════════════════════════════════════
+   SAVE / LOAD
+════════════════════════════════════════ */
+const LS_KEY='oncall_v2';
+function lsLoad(){try{const d=localStorage.getItem(LS_KEY);return d?JSON.parse(d):null;}catch(e){return null;}}
+function lsSave(data){try{localStorage.setItem(LS_KEY,JSON.stringify(data));}catch(e){}}
+
+let saveTimer=null;
+function scheduleSave(){
+  if(saveTimer)clearTimeout(saveTimer);
+  S.savedMsg='جاري الحفظ...';
+  updateSavedMsg();
+  saveTimer=setTimeout(async()=>{
+    const _d={vac:S.vac,schedule:S.schedule,clinicAssign:S.clinicAssign,
+      coverage:S.coverage,clinicNames:S.clinicNames,empType:S.empType,
+      shiftPairs:S.shiftPairs,oncallNeeded:S.oncallNeeded,empNotes:S.empNotes,
+      selDay:S.selDay,curWeek:S.curWeek};
+    lsSave(_d);
+    if(location.protocol!=='file:')await fbSave(_d);
+    S.savedMsg='✓ محفوظ';
+    updateSavedMsg();
+    setTimeout(()=>{S.savedMsg='';updateSavedMsg();},2000);
+  },1500);
+}
+function updateSavedMsg(){
+  const el=document.getElementById('saved-msg');
+  if(!el)return;
+  if(S.savedMsg){el.textContent=S.savedMsg;el.style.display='inline-block';}
+  else el.style.display='none';
+}
+
+/* ════════════════════════════════════════
+   WARN
+════════════════════════════════════════ */
+function warnLevel(emp,dayIdx,precomputed){
+  if(precomputed)return precomputed[emp]||'green';
+  if(dayIdx>=2){
+    const p1=new Set(S.schedule[dayIdx-1]?.oncall||[]);
+    const p2=new Set(S.schedule[dayIdx-2]?.oncall||[]);
+    if(p1.has(emp)&&p2.has(emp))return'red';
+  }
+  const cntBefore=getEffectiveCounts(dayIdx);
+  let slotsBefore=0;
+  for(let d=0;d<dayIdx;d++)slotsBefore+=getOncallNeeded(d);
+  const avg=slotsBefore/14;
+  if(cntBefore[emp]>avg+1)return'yellow';
+  return'green';
+}
+function computeWarnLevels(dayIdx){
+  const result={};
+  if(dayIdx>=2){
+    const p1=new Set(S.schedule[dayIdx-1]?.oncall||[]);
+    const p2=new Set(S.schedule[dayIdx-2]?.oncall||[]);
+    const cntBefore=getEffectiveCounts(dayIdx);
+    let slotsBefore=0;
+    for(let d=0;d<dayIdx;d++)slotsBefore+=getOncallNeeded(d);
+    const avg=slotsBefore/14;
+    EMPLOYEES.forEach(emp=>{
+      if(p1.has(emp)&&p2.has(emp))result[emp]='red';
+      else if(cntBefore[emp]>avg+1)result[emp]='yellow';
+      else result[emp]='green';
+    });
+  } else {
+    const cntBefore=getEffectiveCounts(dayIdx);
+    let slotsBefore=0;
+    for(let d=0;d<dayIdx;d++)slotsBefore+=getOncallNeeded(d);
+    const avg=slotsBefore/14;
+    EMPLOYEES.forEach(emp=>{
+      if(cntBefore[emp]>avg+1)result[emp]='yellow';
+      else result[emp]='green';
+    });
+  }
+  return result;
+}
+const WC={
+  red:{bg:'#fff1f2',border:'#fca5a5',dot:'#ef4444',text:'#b91c1c',tag:'📵 3 أيام متتالية'},
+  yellow:{bg:'#fefce8',border:'#fde047',dot:'#f59e0b',text:'#a16207',tag:'⚠️ زائد'},
+  green:{bg:'#f0fdf4',border:'#86efac',dot:'#22c55e',text:'#166534',tag:'✅ صالح'},
+};
+
+/* ════════════════════════════════════════
+   RENDER CLINIC STAFF CARD
+════════════════════════════════════════ */
+function renderEmpClinicCard(emp,assign,cov,oncallSet,needed,dayIdx,isManager){
+  const pNum=assign[emp];
+  const cNum=cov[emp];
+  const eType=isManager?'full':getEmpType(dayIdx,emp);
+  const pair=isManager?null:getPairOf(dayIdx,emp);
+  const oncallCount=(S.schedule[dayIdx]?.oncall||[]).length;
+  const canAdd=oncallCount<needed&&!oncallSet.has(emp);
+
+  const covClinic=cNum?((S.clinicAssign[dayIdx]||{})[cNum]):null;
+  const covLabel=cNum?('🔄 '+fn(cNum)+(covClinic?' ('+getClinicName(covClinic)+')':'')):'يغطي...';
+  const clinicBtns=`
+    <div style="display:flex;gap:5px;flex-wrap:wrap;margin-top:6px">
+      <span onclick="openClinicPicker('${emp}','primary')" title="العيادة الأساسية" style="cursor:pointer;background:${pNum?'#0d7a5f':'#e5e7eb'};color:${pNum?'white':'#9ca3af'};border-radius:6px;padding:3px 8px;font-size:11px;font-weight:700">${pNum?getClinicName(pNum):'+ عيادة'}</span>
+      <span onclick="openCoveragePicker('${emp}')" title="يغطي عيادة" style="cursor:pointer;background:${cNum?'#eff6ff':'#f9fafb'};color:${cNum?'#1e40af':'#c4c4c4'};border-radius:6px;padding:3px 8px;font-size:11px;font-weight:${cNum?700:400};border:1.5px dashed ${cNum?'#93c5fd':'#e2e8f0'}">${covLabel}</span>
+    </div>`;
+
+  const typeToggle=isManager?'':`
+    <div style="display:flex;gap:4px;margin-bottom:4px">
+      <button onclick="setEmpType('${emp.replace(/'/g,"\\'")}','full')" style="flex:1;padding:3px 0;border-radius:5px;border:1.5px solid ${eType==='full'?'#0d7a5f':'#e5e7eb'};background:${eType==='full'?'#daf0e8':'white'};color:${eType==='full'?'#0d7a5f':'#9ca3af'};font-size:10px;font-weight:${eType==='full'?700:400};font-family:'Tajawal',sans-serif">كامل</button>
+      <button onclick="setEmpType('${emp.replace(/'/g,"\\'")}','shift')" style="flex:1;padding:3px 0;border-radius:5px;border:1.5px solid ${eType==='shift'?'#f59e0b':'#e5e7eb'};background:${eType==='shift'?'#fef3c7':'white'};color:${eType==='shift'?'#b45309':'#9ca3af'};font-size:10px;font-weight:${eType==='shift'?700:400};font-family:'Tajawal',sans-serif">شيفت</button>
+    </div>`;
+
+  const note=(S.empNotes[dayIdx]||{})[emp]||'';
+  const noteField=`<input value="${note.replace(/"/g,'&quot;')}" onchange="setEmpNote('${emp.replace(/'/g,"\\'")}',this.value)" placeholder="💬 تعليق..." style="width:100%;margin-top:5px;padding:4px 8px;border-radius:6px;border:1px solid #e5e7eb;font-size:10px;color:#6b7280;font-family:'Tajawal',sans-serif;background:#fafafa;outline:none" onfocus="this.style.borderColor='#0d7a5f'" onblur="this.style.borderColor='#e5e7eb'"/>`;
+
+  const pairBtn=(eType==='shift'&&!pair&&!isManager)?`<button onclick="openPairPicker('${emp.replace(/'/g,"\\'")}') " style="width:100%;margin-top:5px;padding:4px 0;background:#fff8e1;border:1.5px dashed #fcd34d;border-radius:6px;font-size:10px;color:#b45309;font-weight:600;font-family:'Tajawal',sans-serif">🔗 ربط شريك الشيفت</button>`:'';
+  const unpairBtn=(pair&&!isManager)?`<button onclick="unpairEmp('${emp.replace(/'/g,"\\'")}') " style="font-size:9px;color:#b45309;background:transparent;border:none;padding:0;cursor:pointer;text-decoration:underline;font-family:'Tajawal',sans-serif">فك الربط</button>`:'';
+
+  const nameRow=`
+    <div style="display:flex;justify-content:space-between;align-items:center">
+      <div style="font-size:12px;font-weight:700;color:#374151">أ. ${fn(emp)}${isManager?` <span style="font-size:10px;color:#9ca3af;font-weight:400">رئيس</span>`:''}  ${unpairBtn}</div>
+      ${canAdd&&!isManager?`<span onclick="addOncall('${emp.replace(/'/g,"\\'")}') " title="نقل لمجموعة ب" style="font-size:11px;color:#9ca3af;cursor:pointer;padding:2px 5px;border-radius:5px;background:#f3f4f6" onmouseenter="this.style.color='#1e40af';this.style.background='#eff6ff'" onmouseleave="this.style.color='#9ca3af';this.style.background='#f3f4f6'">📞</span>`:''}
+    </div>`;
+
+  return{nameRow,typeToggle,clinicBtns,pairBtn,noteField,eType};
+}
+
+/* ════════════════════════════════════════
+   MAIN RENDER
+════════════════════════════════════════ */
+function render(){
+  const app=document.getElementById('main-app');
+  const d=ALL_DAYS[S.selDay];
+  const day=S.schedule[S.selDay]||{oncall:[],managerPresent:false};
+  const needed=getOncallNeeded(S.selDay);
+  const oncallSet=new Set(day.oncall);
+  const availToday=EMPLOYEES.filter(e=>isPresent(e,S.selDay));
+  const clinicStaff=availToday.filter(e=>!oncallSet.has(e));
+  const vacToday=EMPLOYEES.filter(e=>!isPresent(e,S.selDay));
+  const totalVacDays=Object.values(S.vac).reduce((s,a)=>s+a.length,0);
+  const cycleWeek=((S.curWeek-1)%7)+1;
+  const warnLevels=computeWarnLevels(S.selDay);
+  const oncallFull=day.oncall.length>=needed;
+  const redW=day.oncall.filter(e=>warnLevels[e]==='red');
+  const yelW=day.oncall.filter(e=>warnLevels[e]==='yellow');
+  const weekDays=WEEKS_MAP[S.curWeek]||[];
+  const assign=S.clinicAssign[S.selDay]||{};
+  const cov=S.coverage[S.selDay]||{};
+
+  // Group clinic staff: SHIFT PAIRS FIRST, then manager, then full/solo
+  const rendered=new Set();
+  let clinicCardsHTML='';
+  const pairs=S.shiftPairs[S.selDay]||{};
+  const processedPairs=new Set();
+
+  // 1. Shift pairs first
+  clinicStaff.forEach(emp=>{
+    if(rendered.has(emp))return;
+    const pair=pairs[emp];
+    const eType=getEmpType(S.selDay,emp);
+    if(pair&&clinicStaff.includes(pair)&&!processedPairs.has(emp)){
+      processedPairs.add(emp);processedPairs.add(pair);
+      rendered.add(emp);rendered.add(pair);
+      const c1=renderEmpClinicCard(emp,assign,cov,oncallSet,needed,S.selDay,false);
+      const c2=renderEmpClinicCard(pair,assign,cov,oncallSet,needed,S.selDay,false);
+      clinicCardsHTML+=`
+      <div class="shift-pair-wrap">
+        <div class="shift-pair-label">↕ شيفت</div>
+        <div>${c1.nameRow}${c1.typeToggle}${c1.clinicBtns}${c1.noteField}</div>
+        <div style="border-top:1px dashed #fcd34d;padding-top:7px">${c2.nameRow}${c2.typeToggle}${c2.clinicBtns}${c2.noteField}</div>
+      </div>`;
+    }
+  });
+
+  // 2. Manager (if present)
+  if(day.managerPresent){
+    const m=renderEmpClinicCard(MANAGER,assign,cov,oncallSet,needed,S.selDay,true);
+    clinicCardsHTML+=`<div class="full-card">${m.nameRow}${m.clinicBtns}${m.noteField}</div>`;
+    rendered.add(MANAGER);
+  }
+
+  // 3. Full / solo shift employees
+  clinicStaff.forEach(emp=>{
+    if(rendered.has(emp)||processedPairs.has(emp))return;
+    rendered.add(emp);
+    const {nameRow,typeToggle,clinicBtns,pairBtn,noteField,eType:et}=renderEmpClinicCard(emp,assign,cov,oncallSet,needed,S.selDay,false);
+    const cls=et==='shift'?'shift-solo-card':(assign[emp]?'full-card':'full-card-empty');
+    clinicCardsHTML+=`<div class="${cls}">${nameRow}${typeToggle}${clinicBtns}${pairBtn}${noteField}</div>`;
+  });
+
+  app.innerHTML=`
+  <!-- HEADER -->
+  <div style="background:linear-gradient(135deg,#0d7a5f,#0fa872);color:white;border-radius:14px;padding:14px 18px;margin-bottom:12px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px">
+    <div>
+      <div style="font-size:18px;font-weight:800">🦷 جدول المناوبة</div>
+      <div style="font-size:11px;opacity:.75;margin-top:3px">قسم صحة الفم والأسنان • 4:00م – 11:00م • ${CLINIC_NUMS.length} عيادات</div>
+    </div>
+    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+      <button onclick="openVacModal()" style="background:rgba(255,255,255,.2);border:1.5px solid rgba(255,255,255,.4);border-radius:9px;padding:8px 14px;color:white;font-size:13px;font-weight:700;display:flex;align-items:center;gap:6px">
+        🏖️ إجازات ${totalVacDays>0?`<span style="background:#fbbf24;color:#1a1a1a;border-radius:10px;padding:1px 7px;font-size:11px;font-weight:800">${totalVacDays}</span>`:''}
+      </button>
+      <button onclick="openCopyModal()" title="نسخ جدول اليوم" style="background:rgba(255,255,255,.2);border:1.5px solid rgba(255,255,255,.4);border-radius:9px;padding:8px 13px;color:white;font-size:13px;font-weight:700">📋 نسخ</button>
+      <button onclick="openSettingsModal()" style="background:rgba(255,255,255,.2);border:1.5px solid rgba(255,255,255,.4);border-radius:9px;padding:8px 13px;color:white;font-size:14px">⚙️</button>
+      <button onclick="openPdfModal()" style="background:rgba(255,255,255,.2);border:1.5px solid rgba(255,255,255,.4);border-radius:9px;padding:8px 14px;color:white;font-size:13px;font-weight:700">🖨️ PDF</button>
+      <button onclick="resetAll()" style="background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.2);border-radius:9px;padding:8px 12px;color:rgba(255,255,255,.7);font-size:13px;border:none">🗑️</button>
+      <span id="saved-msg" style="font-size:11px;color:rgba(255,255,255,.85);background:rgba(0,0,0,.2);border-radius:7px;padding:4px 9px;display:none"></span>
+      <div style="text-align:center;background:rgba(255,255,255,.15);border-radius:10px;padding:7px 13px">
+        <div style="font-size:20px;font-weight:800">${EMPLOYEES.length}</div><div style="font-size:10px;opacity:.8">موظف</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- WEEK NAV -->
+  <div class="card" style="margin-bottom:12px;padding:12px 16px">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+      <button onclick="prevWeek()" ${S.curWeek===1?'disabled':''} style="background:${S.curWeek===1?'#f3f4f6':'#0d7a5f'};color:${S.curWeek===1?'#ccc':'white'};border:none;border-radius:8px;padding:7px 14px;font-size:13px;font-weight:700;opacity:${S.curWeek===1?.5:1}">＜ السابق</button>
+      <div style="text-align:center">
+        <div style="font-size:15px;font-weight:800;color:#0d7a5f">الأسبوع ${S.curWeek} <span style="font-size:11px;font-weight:400;color:#9ca3af">(${[...new Set((WEEKS_MAP[S.curWeek]||[]).map(d=>d.month))].join(' – ')})</span></div>
+        <div style="font-size:12px;color:#6b7280;margin-top:2px">${weekDateRange(S.curWeek)}</div>
+        <div style="margin-top:5px;display:flex;align-items:center;gap:8px;justify-content:center">
+          <span style="font-size:10px;color:#9ca3af">دورة ${cycleWeek}/7</span>
+          <div style="width:70px;height:4px;background:#e5e7eb;border-radius:2px;overflow:hidden"><div style="width:${Math.round(cycleWeek/7*100)}%;height:100%;background:#0d7a5f;border-radius:2px"></div></div>
+        </div>
+      </div>
+      <button onclick="nextWeek()" ${S.curWeek===WEEK_NUMS[WEEK_NUMS.length-1]?'disabled':''} style="background:${S.curWeek===WEEK_NUMS[WEEK_NUMS.length-1]?'#f3f4f6':'#0d7a5f'};color:${S.curWeek===WEEK_NUMS[WEEK_NUMS.length-1]?'#ccc':'white'};border:none;border-radius:8px;padding:7px 14px;font-size:13px;font-weight:700;opacity:${S.curWeek===WEEK_NUMS[WEEK_NUMS.length-1]?.5:1}">التالي ＞</button>
+    </div>
+    <div style="display:flex;gap:6px">
+      ${weekDays.map(dd=>{
+        const ds=S.schedule[dd.idx]||{oncall:[],managerPresent:false};
+        const dprev=new Set(dd.idx>0?(S.schedule[dd.idx-1]?.oncall||[]):[]);
+        const hasRed=(ds.oncall||[]).some(e=>dprev.has(e));
+        const needN=getOncallNeeded(dd.idx);
+        const incomplete=(ds.oncall||[]).length<needN;
+        const vacCnt=EMPLOYEES.filter(e=>!isPresent(e,dd.idx)).length;
+        const isSel=S.selDay===dd.idx;
+        const asCnt=Object.keys(S.clinicAssign[dd.idx]||{}).length;
+        return`<button onclick="selDay(${dd.idx})" style="flex:1;padding:8px 4px;border-radius:10px;border:2px solid ${isSel?'#0d7a5f':'#e5e7eb'};background:${isSel?'#daf0e8':'white'};color:${isSel?'#0d7a5f':'#555'};position:relative;font-size:12px;font-weight:${isSel?800:500};line-height:1.3">
+          ${(hasRed||incomplete)?`<span style="position:absolute;top:-3px;right:-3px;width:9px;height:9px;border-radius:50%;background:${incomplete?'#ef4444':'#f59e0b'};border:2px solid #eef7f4"></span>`:''}
+          <div>${dd.dayShort}</div>
+          <div style="font-size:13px;font-weight:700;margin-top:2px;color:${isSel?'#0d7a5f':'#374151'}">${dd.day}</div>
+          <div style="font-size:10px;opacity:.7">${dd.month}</div>
+          ${vacCnt>0?`<div style="font-size:10px;color:${isSel?'#0d7a5f':'#d97706'};margin-top:2px">🏖️${vacCnt}</div>`:''}
+          ${asCnt>0?`<div style="font-size:10px;color:${isSel?'#0d7a5f':'#6b7280'}">ع${asCnt}</div>`:''}
+        </button>`;
+      }).join('')}
+    </div>
+    <div style="margin-top:10px;padding-top:10px;border-top:1px dashed #e5e7eb;text-align:center;color:#0d7a5f;font-weight:700;font-size:13px">
+      📅 ${d.dayName} ${d.day} ${d.month} ${d.year}
+    </div>
+  </div>
+
+  <!-- WARNINGS -->
+  ${(redW.length||yelW.length)?`
+  <div style="border-radius:9px;padding:10px 14px;margin-bottom:10px;font-size:13px;background:${redW.length?'#fff1f2':'#fefce8'};border:1.5px solid ${redW.length?'#fca5a5':'#fde047'}">
+    ${redW.length?`<div style="color:#b91c1c;font-weight:600">📵 تحذير: <strong>${redW.map(fn).join('، ')}</strong> على الاتصال 3 أيام متتالية!</div>`:''}
+    ${yelW.length?`<div style="color:#a16207${redW.length?';margin-top:4px':''}">⚠️ <strong>${yelW.map(fn).join('، ')}</strong> تجاوزوا متوسط أيام الاتصال</div>`:''}
+  </div>`:''}
+  ${vacToday.length?`
+  <div style="border-radius:9px;padding:10px 14px;margin-bottom:10px;background:#fefce8;border:1.5px solid #fde047;font-size:12px;color:#a16207">
+    🏖️ <strong>غائبون اليوم (${vacToday.length}):</strong> ${vacToday.map(fn).join('، ')} <span style="opacity:.7">— رصيدهم محسوب بالمتوسط</span>
+  </div>`:''}
+
+  <!-- MAIN GRID -->
+  <div style="display:grid;grid-template-columns:1fr 252px;gap:12px">
+    <div style="display:flex;flex-direction:column;gap:10px">
+
+      <!-- MANAGER TOGGLE -->
+      <div class="card" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px">
+        <div style="display:flex;align-items:center;gap:11px">
+          <div style="width:40px;height:40px;border-radius:50%;background:#daf0e8;display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0">👨‍⚕️</div>
+          <div><div style="font-size:14px;font-weight:700">أ. ${MANAGER}</div><div style="font-size:11px;color:#9ca3af">رئيس القسم</div></div>
+        </div>
+        <div style="display:flex;align-items:center;gap:10px">
+          <span style="font-size:12px;font-weight:${day.managerPresent?600:400};color:${day.managerPresent?'#0d7a5f':'#aaa'}">${day.managerPresent?'✅ يحضر للعيادة':'يحضر للعيادة؟'}</span>
+          <div onclick="toggleManager()" style="width:46px;height:26px;border-radius:13px;background:${day.managerPresent?'#0d7a5f':'#d1d5db'};cursor:pointer;position:relative;transition:background .25s;flex-shrink:0">
+            <div style="position:absolute;top:3px;right:${day.managerPresent?3:21}px;width:20px;height:20px;border-radius:50%;background:white;transition:right .25s;box-shadow:0 1px 4px rgba(0,0,0,.25)"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- GROUP A — CLINIC STAFF -->
+      <div class="card">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+          <div style="display:flex;align-items:center;gap:9px">
+            <span style="font-size:15px;font-weight:800;color:#0d7a5f">🏥 مجموعة أ — العيادات</span>
+            <span style="padding:3px 11px;border-radius:20px;font-size:13px;font-weight:700;background:#daf0e8;color:#0d7a5f;border:1.5px solid #86efac">${clinicStaff.length+(day.managerPresent?1:0)}</span>
+          </div>
+          <div style="display:flex;gap:5px;align-items:center">
+            <span style="font-size:10px;color:#9ca3af">كامل / شيفت</span>
+          </div>
+        </div>
+        <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(155px,1fr));gap:9px">
+          ${clinicCardsHTML}
+        </div>
+        ${vacToday.length?`<div style="margin-top:10px;border-top:1px dashed #e5e7eb;padding-top:9px">
+          <div style="font-size:11px;color:#d97706;font-weight:600;margin-bottom:5px">🏖️ في إجازة:</div>
+          <div style="display:flex;gap:5px;flex-wrap:wrap">${vacToday.map(e=>`<div style="background:#fef3c7;border:1.5px solid #fde68a;border-radius:7px;padding:4px 9px;font-size:11px;color:#92400e">${fn(e)}</div>`).join('')}</div>
+        </div>`:''}
+      </div>
+
+      <!-- GROUP B — ONCALL -->
+      <div class="card">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+          <div style="display:flex;align-items:center;gap:9px">
+            <span style="font-size:15px;font-weight:800;color:#1e40af">📞 مجموعة ب — OnCall</span>
+            <span style="padding:3px 11px;border-radius:20px;font-size:13px;font-weight:700;background:${oncallFull?'#eff6ff':'#fee2e2'};color:${oncallFull?'#1e40af':'#b91c1c'};border:1.5px solid ${oncallFull?'#93c5fd':'#fca5a5'}">${day.oncall.length}/${needed}</span>
+            <!-- +/- controls -->
+            <div style="display:flex;align-items:center;gap:4px">
+              <button onclick="adjustNeeded(-1)" style="width:24px;height:24px;border-radius:6px;border:1.5px solid #e5e7eb;background:white;color:#374151;font-size:14px;line-height:1;font-family:'Tajawal',sans-serif;font-weight:700">−</button>
+              <button onclick="adjustNeeded(1)" style="width:24px;height:24px;border-radius:6px;border:1.5px solid #e5e7eb;background:white;color:#374151;font-size:14px;line-height:1;font-family:'Tajawal',sans-serif;font-weight:700">+</button>
+            </div>
+          </div>
+          <button onclick="resetDay()" style="background:#f3f4f6;border:1px solid #e5e7eb;border-radius:7px;padding:5px 12px;font-size:12px;color:#555;font-weight:600">🔄 اقتراح</button>
+        </div>
+        <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(118px,1fr));gap:8px">
+          ${day.oncall.map(emp=>{
+            const w=warnLevels[emp]||'green';const c=WC[w];
+            return`<div onclick="removeOncall('${emp}')" style="background:${c.bg};border:2px solid ${c.border};border-radius:10px;padding:10px 12px;cursor:pointer;user-select:none" onmouseenter="this.style.transform='scale(.97)'" onmouseleave="this.style.transform='scale(1)'">
+              <div style="display:flex;justify-content:space-between;margin-bottom:4px"><div style="width:8px;height:8px;border-radius:50%;background:${c.dot};margin-top:2px"></div><span style="font-size:10px;color:${c.text}">✕</span></div>
+              <div style="font-size:13px;font-weight:700;color:#1a1a1a">أ. ${fn(emp)}</div>
+              <div style="font-size:9px;color:${c.text};margin-top:3px">${c.tag}</div>
+            </div>`;
+          }).join('')}
+          ${day.oncall.length<needed?`<div style="border:2px dashed #c7d2fe;border-radius:10px;padding:10px;display:flex;align-items:center;justify-content:center;background:#fafaff">
+            <span style="font-size:11px;color:#a5b4fc;text-align:center">انقر 📞<br>على موظف</span>
+          </div>`:''}
+        </div>
+      </div>
+
+    </div>
+
+    <!-- RIGHT PANEL -->
+    <div style="display:flex;flex-direction:column;gap:10px">
+      ${renderStats()}
+      <!-- LEGEND -->
+      <div class="card">
+        <div style="font-size:12px;font-weight:800;color:#374151;margin-bottom:9px">🔑 الدليل</div>
+        ${Object.entries(WC).map(([k,c])=>`<div style="display:flex;align-items:center;gap:8px;margin-bottom:7px"><div style="width:13px;height:13px;border-radius:3px;background:${c.bg};border:2px solid ${c.border};flex-shrink:0"></div><span style="font-size:11px;color:#4b5563">${c.tag}</span></div>`).join('')}
+        <div style="margin-top:8px;padding:7px;background:#fffbeb;border-radius:7px;border:1.5px solid #fcd34d">
+          <div style="font-size:10px;color:#b45309;font-weight:700;margin-bottom:2px">↕ شيفت</div>
+          <div style="font-size:9px;color:#92400e;line-height:1.5">شخصان يغطيان عيادات بعض — يظهران معاً بإطار أصفر</div>
+        </div>
+        <div style="margin-top:7px;padding:7px;background:#eff6ff;border-radius:7px;border:1.5px solid #bfdbfe">
+          <div style="font-size:10px;color:#1e40af;font-weight:700;margin-bottom:2px">🔄 يغطي</div>
+          <div style="font-size:9px;color:#1e3a8a;line-height:1.5">الزر الأزرق المنقط = عيادة إضافية يغطيها الموظف</div>
+        </div>
+      </div>
+      <!-- CYCLE -->
+      <div class="card" style="background:linear-gradient(135deg,#0d7a5f,#0fa872);color:white">
+        <div style="font-size:12px;font-weight:800;margin-bottom:6px;opacity:.9">⏱ الدورة الكاملة</div>
+        <div style="font-size:11px;opacity:.8;line-height:1.8"><div>كل <strong style="font-size:13px">7 أسابيع</strong> = دورة</div><div>10 أيام oncall / موظف</div></div>
+        <div style="margin-top:8px;height:5px;background:rgba(255,255,255,.25);border-radius:3px;overflow:hidden">
+          <div style="width:${Math.round(cycleWeek/7*100)}%;height:100%;background:white;border-radius:3px"></div>
+        </div>
+        <div style="font-size:10px;opacity:.7;margin-top:4px">أسبوع ${cycleWeek} من 7</div>
+      </div>
+    </div>
+  </div>`;
+  updateSavedMsg();
+}
+
+/* ════════════════════════════════════════
+   STATS PANEL
+════════════════════════════════════════ */
+function getStatsRange(){
+  if(S.statsMode==='week'){const wd=WEEKS_MAP[S.curWeek]||[];return{f:wd[0]?.idx||0,t:wd[wd.length-1]?.idx||0};}
+  if(S.statsMode==='2weeks'){const wn2=Math.min(S.curWeek+1,WEEK_NUMS[WEEK_NUMS.length-1]);const a=[...(WEEKS_MAP[S.curWeek]||[]),...(WEEKS_MAP[wn2]||[])];return{f:a[0]?.idx||0,t:a[a.length-1]?.idx||0};}
+  if(S.statsMode==='multiweek'){const a=S.statsSelWeeks.flatMap(wn=>WEEKS_MAP[wn]||[]).sort((a,b)=>a.idx-b.idx);return a.length?{f:a[0].idx,t:a[a.length-1].idx}:{f:0,t:0};}
+  return{f:S.statsFrom,t:S.statsTo};
+}
+function renderStats(){
+  const {f,t}=getStatsRange();
+  const counts=getRangeCounts(f,t);
+  const maxC=Math.max(...Object.values(counts),1);
+  const totalSlots=Object.values(S.oncallNeeded).reduce((s,v)=>s+v,0)+(t-f+1-Object.keys(S.oncallNeeded).filter(k=>k>=f&&k<=t).length)*4;
+  const fairShare=totalSlots/EMPLOYEES.length;
+  const fd=ALL_DAYS[f],td=ALL_DAYS[t];
+  return`<div class="card">
+    <div style="font-size:14px;font-weight:800;margin-bottom:10px">📊 عداد الـ OnCall</div>
+    <div style="display:flex;gap:4px;margin-bottom:10px;background:#f3f4f6;border-radius:8px;padding:3px">
+      ${[{k:'week',l:'أسبوع'},{k:'2weeks',l:'أسبوعان'},{k:'multiweek',l:'أسابيع'},{k:'range',l:'فترة'}].map(m=>`
+        <button onclick="setStatsMode('${m.k}')" style="flex:1;padding:5px 2px;border-radius:6px;border:none;font-size:11px;font-weight:${S.statsMode===m.k?700:400};background:${S.statsMode===m.k?'white':'transparent'};color:${S.statsMode===m.k?'#0d7a5f':'#6b7280'};box-shadow:${S.statsMode===m.k?'0 1px 3px rgba(0,0,0,.1)':'none'}">${m.l}</button>`).join('')}
+    </div>
+    ${S.statsMode==='range'?`<div style="margin-bottom:10px;display:flex;flex-direction:column;gap:6px">
+      <select onchange="S.statsFrom=Number(this.value);render()" style="width:100%;padding:6px 10px;border-radius:7px;border:1.5px solid #e5e7eb;font-size:11px;color:#374151;font-family:'Tajawal',sans-serif">
+        ${ALL_DAYS.map(d=>`<option value="${d.idx}" ${d.idx===S.statsFrom?'selected':''}>${d.day} ${d.month} – ${d.dayShort}</option>`).join('')}
+      </select>
+      <div style="text-align:center;font-size:11px;color:#9ca3af">إلى</div>
+      <select onchange="S.statsTo=Number(this.value);render()" style="width:100%;padding:6px 10px;border-radius:7px;border:1.5px solid #e5e7eb;font-size:11px;color:#374151;font-family:'Tajawal',sans-serif">
+        ${ALL_DAYS.filter(d=>d.idx>=S.statsFrom).map(d=>`<option value="${d.idx}" ${d.idx===S.statsTo?'selected':''}>${d.day} ${d.month} – ${d.dayShort}</option>`).join('')}
+      </select>
+    </div>`:''}
+    ${S.statsMode==='multiweek'?`<div style="margin-bottom:10px;display:flex;gap:4px;flex-wrap:wrap">
+      ${WEEK_NUMS.map(wn=>`<button onclick="toggleStatsWeek(${wn})" style="padding:4px 8px;border-radius:6px;border:1.5px solid ${S.statsSelWeeks.includes(wn)?'#0d7a5f':'#e5e7eb'};background:${S.statsSelWeeks.includes(wn)?'#daf0e8':'white'};color:${S.statsSelWeeks.includes(wn)?'#0d7a5f':'#555'};font-size:11px;font-weight:${S.statsSelWeeks.includes(wn)?700:400}">أ${wn}</button>`).join('')}
+    </div>`:''}
+    <div style="font-size:10px;color:#9ca3af;margin-bottom:10px;padding:5px 8px;background:#f9fafb;border-radius:6px">
+      ${fd?.day} ${fd?.month} – ${td?.day} ${td?.month} • متوسط: <strong style="color:#0d7a5f">${fairShare.toFixed(1)}</strong>
+    </div>
+    ${EMPLOYEES.map(emp=>{
+      const cnt=counts[emp],over=cnt>fairShare+0.5,hasV=(S.vac[emp]||[]).length>0;
+      const pct=maxC>0?(cnt/maxC)*100:0;
+      return`<div style="margin-bottom:8px">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:3px">
+          <div style="display:flex;align-items:center;gap:3px"><span style="font-size:11px;color:#374151;font-weight:500">${fn(emp)}</span>${hasV?'<span style="font-size:10px">🏖️</span>':''}</div>
+          <span style="font-size:11px;font-weight:800;color:${over?'#d97706':'#0d7a5f'};background:${over?'#fef3c7':'#daf0e8'};padding:1px 6px;border-radius:5px">${cnt%1===0?cnt:cnt.toFixed(1)}</span>
+        </div>
+        <div style="height:5px;background:#f3f4f6;border-radius:3px;overflow:hidden"><div style="width:${pct}%;height:100%;background:${over?'#f59e0b':'#0d7a5f'};border-radius:3px"></div></div>
+      </div>`;
+    }).join('')}
+  </div>`;
+}
+
+/* ════════════════════════════════════════
+   ACTIONS
+════════════════════════════════════════ */
+function selDay(idx){S.selDay=idx;render();}
+function prevWeek(){if(S.curWeek>1){S.curWeek--;S.selDay=WEEKS_MAP[S.curWeek][WEEKS_MAP[S.curWeek].length-1].idx;render();}}
+function nextWeek(){if(S.curWeek<WEEK_NUMS[WEEK_NUMS.length-1]){S.curWeek++;S.selDay=WEEKS_MAP[S.curWeek][0].idx;render();}}
+function setStatsMode(m){S.statsMode=m;if(m==='multiweek')S.statsSelWeeks=[S.curWeek];render();}
+function toggleStatsWeek(wn){S.statsSelWeeks=S.statsSelWeeks.includes(wn)?S.statsSelWeeks.filter(x=>x!==wn):[...S.statsSelWeeks,wn];render();}
+
+function adjustNeeded(delta){
+  const cur=getOncallNeeded(S.selDay);
+  const next=Math.max(1,Math.min(EMPLOYEES.length,cur+delta));
+  S.oncallNeeded={...S.oncallNeeded,[S.selDay]:next};
+  scheduleSave();render();
+}
+
+function toggleManager(){
+  const day=S.schedule[S.selDay];
+  const np=!day.managerPresent;
+  const tmpSch={...S.schedule,[S.selDay]:{...day,managerPresent:np}};
+  S.schedule={...S.schedule,[S.selDay]:{...day,managerPresent:np,oncall:suggest(S.selDay,np,tmpSch)}};
+  scheduleSave();render();
+}
+function resetDay(){
+  const day=S.schedule[S.selDay];
+  S.schedule={...S.schedule,[S.selDay]:{...day,oncall:suggest(S.selDay,day.managerPresent)}};
+  scheduleSave();render();
+}
+function removeOncall(emp){
+  const day=S.schedule[S.selDay];
+  S.schedule={...S.schedule,[S.selDay]:{...day,oncall:day.oncall.filter(e=>e!==emp)}};
+  scheduleSave();render();
+}
+function addOncall(emp){
+  const day=S.schedule[S.selDay];
+  const needed=getOncallNeeded(S.selDay);
+  if(!day.oncall.includes(emp)&&day.oncall.length<needed){
+    S.schedule={...S.schedule,[S.selDay]:{...day,oncall:[...day.oncall,emp]}};
+    scheduleSave();render();
+  }
+}
+
+/* emp type & pairs */
+function setEmpType(emp,type){
+  if(!S.empType[S.selDay])S.empType[S.selDay]={};
+  S.empType[S.selDay][emp]=type;
+  if(type==='full'){
+    // Remove any pair
+    const pair=getPairOf(S.selDay,emp);
+    if(pair){
+      const p={...(S.shiftPairs[S.selDay]||{})};
+      delete p[emp];delete p[pair];
+      S.shiftPairs={...S.shiftPairs,[S.selDay]:p};
+    }
+  }
+  scheduleSave();render();
+}
+function openPairPicker(emp){
+  S.pairPickerEmp=emp;
+  document.getElementById('pair-picker').classList.remove('hidden');
+  renderPairPicker();
+}
+function closePairPicker(){document.getElementById('pair-picker').classList.add('hidden');S.pairPickerEmp=null;}
+function renderPairPicker(){
+  const emp=S.pairPickerEmp;
+  const day=S.schedule[S.selDay]||{oncall:[]};
+  const oncallSet=new Set(day.oncall);
+  const avail=EMPLOYEES.filter(e=>e!==emp&&isPresent(e,S.selDay)&&!oncallSet.has(e));
+  document.getElementById('pair-picker-label').innerHTML=`اختر شريك الشيفت لـ <strong>أ. ${fn(emp)}</strong>`;
+  document.getElementById('pair-picker-list').innerHTML=avail.map(e=>{
+    const eType=getEmpType(S.selDay,e);
+    const hasPair=getPairOf(S.selDay,e);
+    return`<button onclick="setPair('${emp.replace(/'/g,"\\'")}','${e.replace(/'/g,"\\'")}') " style="width:100%;padding:10px 14px;border-radius:9px;border:1.5px solid ${eType==='shift'?'#fcd34d':'#e5e7eb'};background:${eType==='shift'?'#fffbeb':'white'};color:#374151;font-size:13px;font-weight:600;font-family:'Tajawal',sans-serif;text-align:right;display:flex;justify-content:space-between;align-items:center">
+      <span>أ. ${e}</span>
+      <span style="font-size:10px;color:${eType==='shift'?'#b45309':'#9ca3af'}">${eType==='shift'?(hasPair?'شيفت (مرتبط)':'شيفت'):'كامل'}</span>
+    </button>`;
+  }).join('')||'<div style="text-align:center;color:#9ca3af;font-size:12px;padding:20px">لا يوجد موظفون متاحون</div>';
+}
+function setPair(emp1,emp2){
+  if(!S.shiftPairs[S.selDay])S.shiftPairs[S.selDay]={};
+  if(!S.empType[S.selDay])S.empType[S.selDay]={};
+  // Remove old pairs
+  const oldPair1=getPairOf(S.selDay,emp1);
+  const oldPair2=getPairOf(S.selDay,emp2);
+  if(oldPair1&&oldPair1!==emp2)delete S.shiftPairs[S.selDay][oldPair1];
+  if(oldPair2&&oldPair2!==emp1)delete S.shiftPairs[S.selDay][oldPair2];
+  S.shiftPairs[S.selDay][emp1]=emp2;
+  S.shiftPairs[S.selDay][emp2]=emp1;
+  S.empType[S.selDay][emp1]='shift';
+  S.empType[S.selDay][emp2]='shift';
+  closePairPicker();
+  scheduleSave();render();
+}
+function unpairEmp(emp){
+  const pair=getPairOf(S.selDay,emp);
+  if(!pair)return;
+  const p={...(S.shiftPairs[S.selDay]||{})};
+  delete p[emp];delete p[pair];
+  S.shiftPairs={...S.shiftPairs,[S.selDay]:p};
+  scheduleSave();render();
+}
+
+function setEmpNote(emp,val){
+  if(!S.empNotes[S.selDay])S.empNotes[S.selDay]={};
+  if(val.trim())S.empNotes[S.selDay][emp]=val.trim();
+  else delete S.empNotes[S.selDay][emp];
+  scheduleSave();
+  // no full re-render to avoid losing focus
+}
+
+/* ════════════════════════════════════════
+   COPY DAY MODAL
+════════════════════════════════════════ */
+let copyTargets=new Set();
+function openCopyModal(){
+  copyTargets=new Set();
+  document.getElementById('copy-modal').classList.remove('hidden');
+  document.getElementById('copy-modal-sub').textContent=`نسخ من: ${ALL_DAYS[S.selDay].dayName} ${ALL_DAYS[S.selDay].day} ${ALL_DAYS[S.selDay].month}`;
+  renderCopyModal();
+}
+function closeCopyModal(){document.getElementById('copy-modal').classList.add('hidden');copyTargets=new Set();}
+function renderCopyModal(){
+  const src=S.selDay;
+  document.getElementById('copy-modal-body').innerHTML=`
+    <div style="padding:10px;background:#eff6ff;border-radius:8px;border:1px solid #bfdbfe;font-size:12px;color:#1e40af;margin-bottom:14px">
+      💡 اختر الأيام التي تريد نسخ الجدول إليها. سيتم نسخ: توزيع العيادات، التغطية، نوع الحضور، أزواج الشيفت، وعدد الاتصال.
+    </div>
+    <div style="font-size:12px;color:#6b7280;font-weight:600;margin-bottom:8px">اختر الأيام المستهدفة:</div>
+    ${WEEK_NUMS.map(wn=>`
+      <div style="margin-bottom:12px">
+        <div style="font-size:11px;color:#9ca3af;font-weight:700;margin-bottom:6px;padding-bottom:4px;border-bottom:1px solid #f3f4f6">الأسبوع ${wn} — ${weekDateRange(wn)}</div>
+        <div style="display:flex;gap:6px;flex-wrap:wrap">
+          ${WEEKS_MAP[wn].map(dd=>{
+            const isSrc=dd.idx===src;
+            const isSel=copyTargets.has(dd.idx);
+            return`<button onclick="toggleCopyTarget(${dd.idx})" ${isSrc?'disabled':''} style="padding:6px 10px;border-radius:8px;border:2px solid ${isSrc?'#e5e7eb':isSel?'#0d7a5f':'#e5e7eb'};background:${isSrc?'#f9fafb':isSel?'#daf0e8':'white'};color:${isSrc?'#d1d5db':isSel?'#0d7a5f':'#555'};font-size:12px;font-weight:${isSel?700:400};line-height:1.3;font-family:'Tajawal',sans-serif;cursor:${isSrc?'not-allowed':'pointer'}">
+              ${isSrc?'📌 ':''}${dd.dayShort} ${dd.day} ${dd.month}
+            </button>`;
+          }).join('')}
+        </div>
+      </div>`).join('')}
+    <div style="margin-top:10px;padding:8px 12px;background:#f9fafb;border-radius:8px;font-size:12px;color:#374151">
+      <strong>${copyTargets.size}</strong> يوم محدد
+    </div>`;
+  document.getElementById('copy-confirm-btn').style.opacity=copyTargets.size>0?1:0.5;
+}
+function toggleCopyTarget(idx){
+  if(copyTargets.has(idx))copyTargets.delete(idx);else copyTargets.add(idx);
+  renderCopyModal();
+}
+function executeCopy(){
+  if(copyTargets.size===0)return;
+  const src=S.selDay;
+  const srcOncallNeeded=S.oncallNeeded[src];
+  copyTargets.forEach(tgt=>{
+    // Copy oncall structure (keep target's own suggested oncall but copy needed count)
+    if(srcOncallNeeded!=null)S.oncallNeeded[tgt]=srcOncallNeeded;
+    // Copy clinic assignments
+    S.clinicAssign[tgt]=JSON.parse(JSON.stringify(S.clinicAssign[src]||{}));
+    S.coverage[tgt]=JSON.parse(JSON.stringify(S.coverage[src]||{}));
+    S.empType[tgt]=JSON.parse(JSON.stringify(S.empType[src]||{}));
+    S.shiftPairs[tgt]=JSON.parse(JSON.stringify(S.shiftPairs[src]||{}));
+    S.empNotes[tgt]=JSON.parse(JSON.stringify(S.empNotes[src]||{}));
+    // Copy oncall list too
+    const srcDay=S.schedule[src]||{};
+    if(!S.schedule[tgt])S.schedule[tgt]={oncall:[],managerPresent:false};
+    S.schedule[tgt]={...S.schedule[tgt],oncall:[...(srcDay.oncall||[])],managerPresent:srcDay.managerPresent||false};
+  });
+  closeCopyModal();
+  scheduleSave();render();
+  alert(`✅ تم النسخ لـ ${copyTargets.size} يوم بنجاح`);
+  copyTargets=new Set();
+}
+
+function resetAll(){
+  if(!confirm('هل تريد مسح جميع البيانات والبدء من جديد؟'))return;
+  const names=S.clinicNames;
+  S.vac={};S.schedule=buildInit();S.clinicAssign={};S.coverage={};
+  S.empType={};S.shiftPairs={};S.oncallNeeded={};S.selDay=0;S.curWeek=1;
+  fbSave({vac:{},schedule:S.schedule,clinicAssign:{},coverage:{},clinicNames:names,
+    empType:{},shiftPairs:{},oncallNeeded:{},selDay:0,curWeek:1});
+  render();
+}
+
+/* ════════════════════════════════════════
+   VACATION MODAL
+════════════════════════════════════════ */
+function openVacModal(){
+  S.vacDraft={};EMPLOYEES.forEach(e=>S.vacDraft[e]=[...(S.vac[e]||[])]);
+  S.vacOpenEmp=null;
+  document.getElementById('vac-modal').classList.remove('hidden');
+  renderVacModal();
+}
+function closeVacModal(){document.getElementById('vac-modal').classList.add('hidden');}
+function renderVacModal(){
+  const body=document.getElementById('vac-modal-body');
+  body.innerHTML=EMPLOYEES.map(emp=>{
+    const vd=S.vacDraft[emp]||[];
+    const open=S.vacOpenEmp===emp;
+    return`<div style="margin-bottom:7px;border:1.5px solid ${vd.length?'#fde047':'#e5e7eb'};border-radius:10px;overflow:hidden">
+      <div onclick="toggleVacEmp('${emp}')" style="padding:10px 14px;display:flex;justify-content:space-between;align-items:center;cursor:pointer;background:${vd.length?'#fefce8':'#fafafa'}">
+        <div style="display:flex;align-items:center;gap:10px">
+          <div style="width:30px;height:30px;border-radius:50%;background:${vd.length?'#fde68a':'#e5e7eb'};display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:800;color:${vd.length?'#92400e':'#6b7280'}">${fn(emp)[0]}</div>
+          <div>
+            <div style="font-size:13px;font-weight:700">${emp}</div>
+            ${vd.length?`<div style="font-size:10px;color:#d97706;margin-top:1px">إجازة ${vd.length} ${vd.length===1?'يوم':'أيام'}: ${vd.sort((a,b)=>a-b).map(i=>`${ALL_DAYS[i].day} ${ALL_DAYS[i].month}`).join('، ')}</div>`:''}
+          </div>
+        </div>
+        <div style="display:flex;gap:6px;align-items:center">
+          ${vd.length?`<button onclick="event.stopPropagation();clearVacEmp('${emp}')" style="background:#fee2e2;border:none;border-radius:6px;padding:3px 8px;font-size:11px;color:#b91c1c;font-weight:600;font-family:'Tajawal',sans-serif;cursor:pointer">مسح</button>`:''}
+          <span style="color:#9ca3af;font-size:11px">${open?'▲':'▼'}</span>
+        </div>
+      </div>
+      ${open?`<div style="padding:10px 14px;border-top:1px solid #e5e7eb;background:white">
+        ${WEEK_NUMS.map(wn=>`<div style="margin-bottom:10px">
+          <div style="font-size:10px;color:#9ca3af;font-weight:600;margin-bottom:5px">الأسبوع ${wn} — ${weekDateRange(wn)}</div>
+          <div style="display:flex;gap:5px;flex-wrap:wrap">
+            ${WEEKS_MAP[wn].map(d=>{const on=vd.includes(d.idx);return`<button onclick="toggleVacDay('${emp}',${d.idx})" style="padding:5px 10px;border-radius:7px;border:2px solid ${on?'#f59e0b':'#e5e7eb'};background:${on?'#fef3c7':'white'};color:${on?'#92400e':'#6b7280'};font-size:12px;font-weight:${on?700:400};line-height:1.3;text-align:center;font-family:'Tajawal',sans-serif;cursor:pointer">${on?'🏖️ ':''}${d.day} ${d.month}<br><span style="font-size:9px;opacity:.6">${d.dayShort}</span></button>`;}).join('')}
+          </div>
+        </div>`).join('')}
+      </div>`:''}
+    </div>`;
+  }).join('');
+}
+function toggleVacEmp(emp){S.vacOpenEmp=S.vacOpenEmp===emp?null:emp;renderVacModal();}
+function toggleVacDay(emp,idx){
+  const arr=S.vacDraft[emp]||[];
+  S.vacDraft[emp]=arr.includes(idx)?arr.filter(x=>x!==idx):[...arr,idx];
+  renderVacModal();
+}
+function clearVacEmp(emp){S.vacDraft[emp]=[];renderVacModal();}
+function saveVacModal(){
+  S.vac={};EMPLOYEES.forEach(e=>{if((S.vacDraft[e]||[]).length)S.vac[e]=S.vacDraft[e];});
+  S.schedule=buildInit();
+  closeVacModal();
+  scheduleSave();render();
+}
+
+/* ════════════════════════════════════════
+   SETTINGS MODAL
+════════════════════════════════════════ */
+function openSettingsModal(){
+  S.settingsDraft={};
+  CLINIC_NUMS.forEach(n=>S.settingsDraft[n]=S.clinicNames[n]||`ع${n}`);
+  document.getElementById('settings-modal').classList.remove('hidden');
+  renderSettingsModal();
+}
+function closeSettingsModal(){document.getElementById('settings-modal').classList.add('hidden');}
+function renderSettingsModal(){
+  document.getElementById('settings-modal-body').innerHTML=`
+    <div style="font-size:12px;color:#6b7280;margin-bottom:14px;padding:10px;background:#f0fdf4;border-radius:8px;border:1px solid #86efac">
+      💡 غيّر اسم أي عيادة. الاسم الجديد يظهر في كل أنحاء التطبيق والـ PDF.
+    </div>
+    ${CLINIC_NUMS.map(num=>`
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
+      <div style="width:40px;height:36px;background:#0d7a5f;color:white;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:800;flex-shrink:0">ع${num}</div>
+      <input id="cname-${num}" value="${S.settingsDraft[num]||`ع${num}`}" oninput="S.settingsDraft[${num}]=this.value" style="flex:1;padding:8px 12px;border-radius:8px;border:1.5px solid #e5e7eb;font-size:13px;font-family:'Tajawal',sans-serif;color:#374151;outline:none" onfocus="this.style.borderColor='#0d7a5f'" onblur="this.style.borderColor='#e5e7eb'"/>
+      <button onclick="document.getElementById('cname-${num}').value='ع${num}';S.settingsDraft[${num}]='ع${num}'" style="padding:6px 10px;background:#f3f4f6;border:none;border-radius:7px;font-size:11px;color:#6b7280;font-family:'Tajawal',sans-serif;cursor:pointer">↩</button>
+    </div>`).join('')}`;
+}
+function saveSettingsModal(){
+  S.clinicNames={};
+  CLINIC_NUMS.forEach(n=>{
+    const v=(S.settingsDraft[n]||'').trim();
+    if(v&&v!==`ع${n}`)S.clinicNames[n]=v;
+  });
+  closeSettingsModal();
+  scheduleSave();render();
+}
+
+/* ════════════════════════════════════════
+   CLINIC PICKER
+════════════════════════════════════════ */
+function openClinicPicker(emp,mode){
+  S.pickerEmp=emp||null;
+  S.pickerMode='primary';
+  document.getElementById('clinic-picker').classList.remove('hidden');
+  renderClinicPicker();
+}
+function closeClinicPicker(){document.getElementById('clinic-picker').classList.add('hidden');S.pickerEmp=null;}
+function renderClinicPicker(){
+  const emp=S.pickerEmp;
+  const assign=S.clinicAssign[S.selDay]||{};
+  const clinicEmp={};Object.entries(assign).forEach(([e,c])=>clinicEmp[c]=e);
+  const currentVal=assign[emp];
+  document.getElementById('clinic-picker-title').textContent='🏥 العيادة الأساسية';
+  document.getElementById('clinic-picker-label').innerHTML=emp?`<strong>أ. ${fn(emp)}</strong> — اختر العيادة الأساسية`:'';
+  document.getElementById('clinic-picker-tabs').innerHTML='';
+  document.getElementById('clinic-picker-grid').innerHTML=CLINIC_NUMS.map(num=>{
+    const isMine=currentVal===num;
+    const takenBy=clinicEmp[num];
+    const isTaken=takenBy&&takenBy!==emp;
+    return`<button onclick="assignClinic(${num})" style="padding:9px 4px;border-radius:9px;border:2px solid ${isMine?'#0d7a5f':isTaken?'#fca5a5':'#e5e7eb'};background:${isMine?'#daf0e8':isTaken?'#fff1f2':'white'};color:${isMine?'#0d7a5f':isTaken?'#b91c1c':'#374151'};font-weight:${isMine?800:500};font-size:11px;line-height:1.3;font-family:'Tajawal',sans-serif;cursor:pointer">
+      ${getClinicName(num)}${isTaken?`<div style="font-size:9px;margin-top:1px;opacity:.8">${fn(takenBy)}</div>`:''}${isMine?`<div style="font-size:9px;margin-top:1px">✓</div>`:''}
+    </button>`;
+  }).join('');
+  const removeBtn=document.getElementById('clinic-picker-remove');
+  if(emp&&currentVal)removeBtn.classList.remove('hidden');else removeBtn.classList.add('hidden');
+}
+function assignClinic(num){
+  if(!S.pickerEmp)return;
+  const emp=S.pickerEmp;
+  const assign={...(S.clinicAssign[S.selDay]||{})};
+  Object.keys(assign).forEach(e=>{if(assign[e]===num&&e!==emp)delete assign[e];});
+  assign[emp]=num;
+  S.clinicAssign={...S.clinicAssign,[S.selDay]:assign};
+  closeClinicPicker();scheduleSave();render();
+}
+function clinicPickerRemove(){
+  if(!S.pickerEmp)return;
+  const assign={...(S.clinicAssign[S.selDay]||{})};
+  delete assign[S.pickerEmp];
+  S.clinicAssign={...S.clinicAssign,[S.selDay]:assign};
+  closeClinicPicker();scheduleSave();render();
+}
+
+/* Coverage Picker — picks employee by name */
+function openCoveragePicker(emp){
+  S.pickerEmp=emp;
+  document.getElementById('coverage-picker').classList.remove('hidden');
+  renderCoveragePicker();
+}
+function closeCoveragePicker(){document.getElementById('coverage-picker').classList.add('hidden');S.pickerEmp=null;}
+function renderCoveragePicker(){
+  const emp=S.pickerEmp;
+  const cov=S.coverage[S.selDay]||{};
+  const currentTarget=cov[emp]||null;
+  const assign=S.clinicAssign[S.selDay]||{};
+  // Show ALL employees except self — oncall, vacation, everyone
+  const candidates=EMPLOYEES.filter(e=>e!==emp);
+  const day=S.schedule[S.selDay]||{oncall:[]};
+  const oncallSet=new Set(day.oncall);
+  document.getElementById('coverage-picker-label').innerHTML=`<strong>أ. ${fn(emp)}</strong> — اختر الأخصائي الذي يغطي عيادته`;
+  document.getElementById('coverage-picker-list').innerHTML=candidates.map(e=>{
+    const isSel=currentTarget===e;
+    const isOnCall=oncallSet.has(e);
+    const isAbsent=!isPresent(e,S.selDay);
+    const clinicNum=assign[e];
+    const tag=isAbsent?'🏖️ إجازة':isOnCall?'📞 OnCall':'🏥 عيادة';
+    const tagColor=isAbsent?'#d97706':isOnCall?'#1e40af':'#0d7a5f';
+    return`<button onclick="assignCoverage('${e.replace(/'/g,"\\'")}') " style="width:100%;padding:9px 14px;border-radius:9px;border:2px solid ${isSel?'#1e40af':'#e5e7eb'};background:${isSel?'#eff6ff':'white'};color:#374151;font-size:13px;font-weight:${isSel?700:500};font-family:'Tajawal',sans-serif;text-align:right;display:flex;justify-content:space-between;align-items:center;gap:8px">
+      <div style="display:flex;flex-direction:column;gap:2px;text-align:right">
+        <span>أ. ${fn(e)}</span>
+        ${clinicNum?`<span style="font-size:10px;color:#0d7a5f;font-weight:700">${getClinicName(clinicNum)}</span>`:''}
+      </div>
+      <div style="display:flex;align-items:center;gap:6px">
+        <span style="font-size:10px;color:${tagColor};background:${isAbsent?'#fef3c7':isOnCall?'#eff6ff':'#f0fdf4'};padding:2px 7px;border-radius:10px;white-space:nowrap">${tag}</span>
+        ${isSel?'<span style="color:#1e40af;font-size:13px">✓</span>':''}
+      </div>
+    </button>`;
+  }).join('')||'<div style="text-align:center;color:#9ca3af;font-size:12px;padding:16px">لا يوجد موظفون</div>';
+  const removeBtn=document.getElementById('coverage-picker-remove');
+  if(currentTarget)removeBtn.classList.remove('hidden');else removeBtn.classList.add('hidden');
+}
+function assignCoverage(targetEmp){
+  const emp=S.pickerEmp;
+  const cov={...(S.coverage[S.selDay]||{})};
+  cov[emp]=targetEmp;
+  S.coverage={...S.coverage,[S.selDay]:cov};
+  closeCoveragePicker();scheduleSave();render();
+}
+function removeCoverage(){
+  const emp=S.pickerEmp;
+  const cov={...(S.coverage[S.selDay]||{})};
+  delete cov[emp];
+  S.coverage={...S.coverage,[S.selDay]:cov};
+  closeCoveragePicker();scheduleSave();render();
+}
+
+/* ════════════════════════════════════════
+   PDF
+════════════════════════════════════════ */
+function openPdfModal(){document.getElementById('pdf-modal').classList.remove('hidden');renderPdfModal();}
+function closePdfModal(){document.getElementById('pdf-modal').classList.add('hidden');}
+function getPdfDays(){
+  const p=S.pdfPeriod,i=S.pdfSelIdx;
+  if(p==='day')return[ALL_DAYS[i]];
+  if(p==='2days')return ALL_DAYS.slice(i,i+2);
+  if(p==='week'){const wn=ALL_DAYS[i]?.weekNum;return WEEKS_MAP[wn]||[];}
+  if(p==='month'){const mn=ALL_DAYS[i]?.monthNum;return ALL_DAYS.filter(d=>d.monthNum===mn);}
+  return[];
+}
+function renderPdfModal(){
+  const days=getPdfDays();
+  const first=days[0],last=days[days.length-1];
+  const preview=days.length===1?`${first?.dayName} ${first?.day} ${first?.month}`:`${first?.day} ${first?.month} – ${last?.day} ${last?.month}`;
+  document.getElementById('pdf-modal-body').innerHTML=`
+  <div class="card" style="margin-bottom:12px">
+    <div style="font-size:13px;font-weight:700;margin-bottom:10px;color:#374151">📋 نوع التقرير</div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap">
+      ${[{k:'day',l:'📄 يومي'},{k:'2days',l:'📄 يومان'},{k:'week',l:'📅 أسبوعي'},{k:'month',l:'📆 شهري'}].map(p=>`
+        <button onclick="S.pdfPeriod='${p.k}';renderPdfModal()" style="flex:1;min-width:100px;padding:10px 8px;border-radius:9px;border:2px solid ${S.pdfPeriod===p.k?'#0d7a5f':'#e5e7eb'};background:${S.pdfPeriod===p.k?'#daf0e8':'white'};color:${S.pdfPeriod===p.k?'#0d7a5f':'#555'};font-size:13px;font-weight:${S.pdfPeriod===p.k?700:400};font-family:'Tajawal',sans-serif">${p.l}</button>`).join('')}
+    </div>
+  </div>
+  <div class="card" style="margin-bottom:12px">
+    <div style="font-size:13px;font-weight:700;margin-bottom:10px;color:#374151">📅 اختر الفترة</div>
+    ${S.pdfPeriod==='day'||S.pdfPeriod==='2days'?`<select onchange="S.pdfSelIdx=Number(this.value);renderPdfModal()" style="width:100%;padding:9px 12px;border-radius:8px;border:1.5px solid #e5e7eb;font-size:13px;background:white;color:#374151;font-family:'Tajawal',sans-serif">
+      ${ALL_DAYS.map(d=>`<option value="${d.idx}" ${d.idx===S.pdfSelIdx?'selected':''}>${d.dayName} – ${d.day} ${d.month} ${d.year}</option>`).join('')}
+    </select>`:''}
+    ${S.pdfPeriod==='week'?`<div style="display:flex;gap:6px;flex-wrap:wrap">
+      ${WEEK_NUMS.map(wn=>{const cur=ALL_DAYS[S.pdfSelIdx]?.weekNum;return`<button onclick="S.pdfSelIdx=${WEEKS_MAP[wn][0].idx};renderPdfModal()" style="flex:1;min-width:80px;padding:8px 6px;border-radius:8px;border:2px solid ${cur===wn?'#0d7a5f':'#e5e7eb'};background:${cur===wn?'#daf0e8':'white'};color:${cur===wn?'#0d7a5f':'#555'};font-size:11px;font-weight:${cur===wn?700:400};line-height:1.4;text-align:center;font-family:'Tajawal',sans-serif;cursor:pointer">أسبوع ${wn}<br><span style="font-size:9px;opacity:.7">${weekDateRange(wn)}</span></button>`;}).join('')}
+    </div>`:''}
+    ${S.pdfPeriod==='month'?`<div style="display:flex;gap:6px;flex-wrap:wrap">
+      ${[...new Set(ALL_DAYS.map(d=>d.monthNum))].map(mn=>{const cur=ALL_DAYS[S.pdfSelIdx]?.monthNum;const yr=ALL_DAYS.find(d=>d.monthNum===mn)?.year;return`<button onclick="S.pdfSelIdx=${ALL_DAYS.find(d=>d.monthNum===mn).idx};renderPdfModal()" style="flex:1;min-width:90px;padding:9px 8px;border-radius:8px;border:2px solid ${cur===mn?'#0d7a5f':'#e5e7eb'};background:${cur===mn?'#daf0e8':'white'};color:${cur===mn?'#0d7a5f':'#555'};font-size:13px;font-weight:${cur===mn?700:400};font-family:'Tajawal',sans-serif;cursor:pointer">${AR_MONTHS[mn]} ${yr}</button>`;}).join('')}
+    </div>`:''}
+    <div style="margin-top:10px;padding:8px 12px;background:#f0fdf4;border-radius:8px;font-size:12px;color:#0d7a5f;font-weight:600">📄 ${preview} (${days.length} يوم)</div>
+  </div>
+  <div class="card" style="margin-bottom:12px">
+    <div style="font-size:13px;font-weight:700;margin-bottom:8px;color:#374151">✏️ عنوان التقرير</div>
+    <input value="${S.pdfHeader}" oninput="S.pdfHeader=this.value" style="width:100%;padding:9px 12px;border-radius:8px;border:1.5px solid #e5e7eb;font-size:13px;color:#374151"/>
+  </div>
+  <div class="card">
+    <div style="font-size:13px;font-weight:700;margin-bottom:8px;color:#374151">📝 ملاحظات</div>
+    <textarea oninput="S.pdfNotes=this.value" rows="3" placeholder="ملاحظات تظهر في التقرير..." style="width:100%;padding:9px 12px;border-radius:8px;border:1.5px solid #e5e7eb;font-size:13px;resize:vertical;color:#374151;line-height:1.6">${S.pdfNotes}</textarea>
+  </div>`;
+}
+function doPrint(){
+  const days=getPdfDays();
+  if(!days.length)return;
+  const periodLabel={day:'يومي','2days':'يومان',week:'أسبوعي',month:'شهري'}[S.pdfPeriod];
+  const f=days[0],l=days[days.length-1];
+  const dateRange=days.length===1?`${f.dayName} ${f.day} ${f.month} ${f.year}`:`${f.day} ${f.month} – ${l.day} ${l.month} ${f.year}`;
+  const rows=days.map(d=>{
+    const s=S.schedule[d.idx]||{oncall:[],managerPresent:false};
+    const oncall=s.oncall||[];
+    const mp=s.managerPresent;
+    const assign=S.clinicAssign[d.idx]||{};
+    const cov=S.coverage[d.idx]||{};
+    const pairs=S.shiftPairs[d.idx]||{};
+    const empType=S.empType[d.idx]||{};
+    const notes=S.empNotes[d.idx]||{};
+    const cEmp={};Object.entries(assign).forEach(([e,c])=>cEmp[c]=e);
+    const absent=EMPLOYEES.filter(e=>!isPresent(e,d.idx));
+    const oncallSet=new Set(oncall);
+    const clinicStaff=EMPLOYEES.filter(e=>isPresent(e,d.idx)&&!oncallSet.has(e));
+    const processedPdf=new Set();
+    const fs=days.length===1?'13px':'11px';
+    const fss=days.length===1?'11px':'9px';
+    let groupsHTML='';
+    const pdfEmpLine=(e)=>{
+      const note=notes[e];
+      const covTarget=cov[e]; // now an employee name
+      return`أ. ${fn(e)}${assign[e]?' — '+getClinicName(assign[e]):''}${covTarget?' (يغطي عيادة '+fn(covTarget)+')':''}${note?` <span style="color:#6b7280;font-size:${fss}">| ${note}</span>`:''}`;
+    };
+    // Shift pairs first
+    clinicStaff.forEach(emp=>{
+      if(processedPdf.has(emp))return;
+      const pair=pairs[emp];
+      if(pair&&clinicStaff.includes(pair)&&!processedPdf.has(pair)){
+        processedPdf.add(emp);processedPdf.add(pair);
+        groupsHTML+=`<div style="margin:5px 0;padding:6px 10px;background:#fffbeb;border-radius:6px;border-right:3px solid #f59e0b;font-size:${fs}">
+          <div style="font-size:${fss};color:#b45309;font-weight:700;margin-bottom:4px">↕ شيفت</div>
+          <div style="padding:2px 0">${pdfEmpLine(emp)}</div>
+          <div style="padding:2px 0;margin-top:3px">${pdfEmpLine(pair)}</div>
+        </div>`;
+      }
+    });
+    // Manager
+    if(mp){groupsHTML+=`<div style="font-size:${fs};padding:5px 0;border-bottom:1px dashed #e5e7eb">👨‍⚕️ ${pdfEmpLine(MANAGER)}</div>`;}
+    // Full/solo
+    clinicStaff.forEach(emp=>{
+      if(processedPdf.has(emp))return;
+      processedPdf.add(emp);
+      groupsHTML+=`<div style="font-size:${fs};padding:5px 0;border-bottom:1px dashed #e5e7eb">${pdfEmpLine(emp)}</div>`;
+    });
+    return`<div style="margin-bottom:14px;page-break-inside:avoid">
+      <div style="background:#0d7a5f;color:white;padding:${days.length===1?'10px 16px':'8px 14px'};border-radius:8px 8px 0 0;display:flex;justify-content:space-between;align-items:center">
+        <div style="font-size:${days.length===1?'17px':'15px'};font-weight:800">${d.dayName} ${d.day} ${d.month} ${d.year}</div>
+        <div style="font-size:11px;opacity:.8">الأسبوع ${d.weekNum}</div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;border:1px solid #e5e7eb;border-top:none;border-radius:0 0 8px 8px;overflow:hidden">
+        <div style="border-left:1px solid #e5e7eb">
+          <div style="background:#f0fdf4;padding:${days.length===1?'8px 12px':'6px 10px'};font-size:${days.length===1?'12px':'11px'};font-weight:700;color:#0d7a5f;border-bottom:1px solid #e5e7eb">🏥 مجموعة أ — العيادات</div>
+          <div style="padding:${days.length===1?'10px 12px':'8px 10px'}">${groupsHTML}</div>
+        </div>
+        <div>
+          <div style="background:#eff6ff;padding:${days.length===1?'8px 12px':'6px 10px'};font-size:${days.length===1?'12px':'11px'};font-weight:700;color:#1e40af;border-bottom:1px solid #e5e7eb">📞 مجموعة ب — OnCall (${oncall.length})</div>
+          <div style="padding:${days.length===1?'12px':'10px'};font-size:${days.length===1?'13px':'12px'};line-height:${days.length===1?2.2:2}">${oncall.map(e=>`<div style="padding:3px 0;border-bottom:1px dashed #f3f4f6">أ. ${fn(e)}</div>`).join('')}</div>
+          ${absent.length?`<div style="background:#fef9c3;padding:6px 10px;font-size:11px;border-top:1px solid #e5e7eb">🏖️ إجازة: ${absent.map(e=>fn(e)).join('، ')}</div>`:''}
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+  closePdfModal();
+  const isSingle=days.length===1;
+  document.getElementById('print-area').innerHTML=`
+    <div style="font-family:'Tajawal',sans-serif;direction:rtl;color:#1a1a1a${isSingle?';font-size:13px':''}">
+      <div style="border-bottom:3px solid #0d7a5f;padding-bottom:${isSingle?'14px':'12px'};margin-bottom:${isSingle?'18px':'16px'};display:flex;justify-content:space-between;align-items:flex-end">
+        <div>
+          <div style="font-size:${isSingle?'22px':'20px'};font-weight:800;color:#0d7a5f">🦷 جدول توزيع العيادات ومناوبة OnCall</div>
+          <div style="font-size:${isSingle?'14px':'13px'};color:#6b7280;margin-top:4px">${S.pdfHeader}</div>
+        </div>
+        <div style="text-align:left;font-size:12px;color:#6b7280">
+          <div>الفترة: <strong>${periodLabel}</strong></div><div>${dateRange}</div>
+          <div>طُبع: ${new Date().toLocaleDateString('ar-SA')}</div>
+        </div>
+      </div>
+      ${S.pdfNotes?`<div style="background:#fef9e7;border:1.5px solid #fde68a;border-radius:8px;padding:10px 14px;margin-bottom:16px;font-size:13px;color:#78350f;white-space:pre-wrap">${S.pdfNotes}</div>`:''}
+      ${rows}
+    </div>`;
+  window.print();
+}
+
+/* ════════════════════════════════════════
+   INIT
+════════════════════════════════════════ */
+function applyData(data){
+  if(!data)return;
+  if(data.vac)S.vac=data.vac;
+  if(data.schedule)S.schedule=data.schedule;
+  if(data.clinicAssign)S.clinicAssign=data.clinicAssign;
+  if(data.coverage)S.coverage=data.coverage;
+  if(data.clinicNames)S.clinicNames=data.clinicNames;
+  if(data.empType)S.empType=data.empType;
+  if(data.shiftPairs)S.shiftPairs=data.shiftPairs;
+  if(data.oncallNeeded)S.oncallNeeded=data.oncallNeeded;
+  if(data.empNotes)S.empNotes=data.empNotes;
+  if(data.selDay!=null)S.selDay=data.selDay;
+  if(data.curWeek!=null)S.curWeek=data.curWeek;
+}
+
+function showApp(){
+  if(!Object.keys(S.schedule).length)S.schedule=buildInit();
+  document.getElementById('loading-screen').classList.add('hidden');
+  document.getElementById('main-app').classList.remove('hidden');
+  render();
+}
+
+async function init(){
+  const isLocal=location.protocol==='file:';
+  const lsData=lsLoad();
+  if(lsData)applyData(lsData);
+  showApp();
+  if(!isLocal){
+    fbLoad().then(fbData=>{
+      if(fbData){
+        applyData(fbData);
+        lsSave({vac:S.vac,schedule:S.schedule,clinicAssign:S.clinicAssign,
+          coverage:S.coverage,clinicNames:S.clinicNames,empType:S.empType,
+          shiftPairs:S.shiftPairs,oncallNeeded:S.oncallNeeded,empNotes:S.empNotes,
+          selDay:S.selDay,curWeek:S.curWeek});
+        render();
+      }
+    }).catch(()=>{});
+  }
+}
+init();
+</script>
+</body>
+</html>
